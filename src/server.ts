@@ -80,10 +80,10 @@ const connectDB = async () => {
       const memoryUri = mongoServer.getUri();
       await mongoose.connect(memoryUri);
       console.log(`Connected to Fallback MongoDB Memory Server at ${memoryUri}`);
-      
+
       // Seed the memory database automatically since it's fresh
       try {
-        const fetch = (await import('node-fetch')).default || global.fetch;
+        const fetch = global.fetch;
         setTimeout(() => {
           fetch(`http://localhost:${PORT}/api/seed/admin`, { method: 'POST' }).catch(() => {});
         }, 2000);
