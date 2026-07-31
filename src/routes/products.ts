@@ -3,11 +3,27 @@ import Product from '../models/Product.js';
 import multer from 'multer';
 import csvParser from 'csv-parser';
 import { Parser } from 'json2csv';
-import fs from 'fs';
+import { Readable } from 'node:stream';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 
 const router = Router();
-const upload = multer({ dest: 'uploads/' });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }
+});
+
+type CsvProductRow = Record<string, string>;
+
+const parseCsvBuffer = (buffer: Buffer) =>
+  new Promise<CsvProductRow[]>((resolve, reject) => {
+    const results: CsvProductRow[] = [];
+
+    Readable.from([buffer])
+      .pipe(csvParser())
+      .on('data', (data: CsvProductRow) => results.push(data))
+      .on('end', () => resolve(results))
+      .on('error', reject);
+  });
 
 // GET all products (Supports category, ageGroup, search, isVisible filter)
 router.get('/', async (req: Request, res: Response) => {
@@ -117,41 +133,37 @@ router.post('/import/csv', authenticateToken, requireAdmin, upload.single('file'
     return res.status(400).json({ error: 'Please upload a CSV file' });
   }
 
-  const results: any[] = [];
-  fs.createReadStream(req.file.path)
-    .pipe(csvParser())
-    .on('data', (data) => results.push(data))
-    .on('end', async () => {
-      try {
-        for (const item of results) {
-          if (item.name && item.price) {
-            const slug = item.slug || item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-            await Product.findOneAndUpdate(
-              { slug },
-              {
-                name: item.name,
-                slug,
-                price: Number(item.price),
-                originalPrice: item.originalPrice ? Number(item.originalPrice) : undefined,
-                category: item.category || 'Toys',
-                categorySlug: item.categorySlug || 'toys',
-                ageGroup: item.ageGroup || '3-5',
-                brand: item.brand || 'PlayBimboo',
-                stockQuantity: Number(item.stockQuantity) || 10,
-                description: item.description || 'Quality toy for kids.',
-                isVisible: item.isVisible === 'false' ? false : true,
-                images: item.images ? item.images.split(',') : ['https://images.unsplash.com/photo-1587654780291-39c9404d746b?auto=format&fit=crop&w=600&q=80']
-              },
-              { upsert: true, new: true }
-            );
-          }
-        }
-        fs.unlinkSync(req.file!.path);
-        res.json({ message: `Successfully imported ${results.length} products` });
-      } catch (err: any) {
-        res.status(500).json({ error: err.message });
+  try {
+    const results = await parseCsvBuffer(req.file.buffer);
+
+    for (const item of results) {
+      if (item.name && item.price) {
+        const slug = item.slug || item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        await Product.findOneAndUpdate(
+          { slug },
+          {
+            name: item.name,
+            slug,
+            price: Number(item.price),
+            originalPrice: item.originalPrice ? Number(item.originalPrice) : undefined,
+            category: item.category || 'Toys',
+            categorySlug: item.categorySlug || 'toys',
+            ageGroup: item.ageGroup || '3-5',
+            brand: item.brand || 'PlayBimboo',
+            stockQuantity: Number(item.stockQuantity) || 10,
+            description: item.description || 'Quality toy for kids.',
+            isVisible: item.isVisible === 'false' ? false : true,
+            images: item.images ? item.images.split(',') : ['https://images.unsplash.com/photo-1587654780291-39c9404d746b?auto=format&fit=crop&w=600&q=80']
+          },
+          { upsert: true, new: true }
+        );
       }
-    });
+    }
+
+    res.json({ message: `Successfully imported ${results.length} products` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 export default router;
