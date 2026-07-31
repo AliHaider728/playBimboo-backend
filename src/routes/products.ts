@@ -60,6 +60,22 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
+// GET Export CSV
+router.get('/export/csv', async (req: Request, res: Response) => {
+  try {
+    const products = await Product.find().lean();
+    const fields = ['_id', 'name', 'slug', 'price', 'originalPrice', 'category', 'categorySlug', 'ageGroup', 'brand', 'stockQuantity', 'isVisible', 'deliveryType', 'description'];
+    const json2csvParser = new Parser({ fields });
+    const csv = json2csvParser.parse(products);
+
+    res.header('Content-Type', 'text/csv');
+    res.attachment('playbimboo-products.csv');
+    return res.send(csv);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET single product by slug or ID
 router.get('/:idOrSlug', async (req: Request, res: Response) => {
   try {
@@ -106,22 +122,6 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req: Request, res:
     const deleted = await Product.findByIdAndDelete(req.params.id);
     if (!deleted) return res.status(404).json({ error: 'Product not found' });
     res.json({ message: 'Product deleted successfully' });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// GET Export CSV
-router.get('/export/csv', async (req: Request, res: Response) => {
-  try {
-    const products = await Product.find().lean();
-    const fields = ['_id', 'name', 'slug', 'price', 'originalPrice', 'category', 'categorySlug', 'ageGroup', 'brand', 'stockQuantity', 'isVisible', 'deliveryType', 'description'];
-    const json2csvParser = new Parser({ fields });
-    const csv = json2csvParser.parse(products);
-
-    res.header('Content-Type', 'text/csv');
-    res.attachment('playbimboo-products.csv');
-    return res.send(csv);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
