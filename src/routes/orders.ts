@@ -2,16 +2,23 @@ import { Router, Request, Response } from 'express';
 import Order from '../models/Order.js';
 import Product from '../models/Product.js';
 import { sendOrderConfirmationEmail, sendOrderStatusEmail } from '../utils/mailer.js';
-import { authenticateToken, requireAdmin } from '../middleware/auth.js';
+import { authenticateToken, requireAdmin, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
 // GET all orders (with optional email filter for customer history)
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const { email } = req.query;
     const filter: any = {};
-    if (email) filter.email = email;
+
+    if (req.user?.role === 'admin') {
+      if (typeof email === 'string' && email.trim()) {
+        filter.email = email.trim().toLowerCase();
+      }
+    } else {
+      filter.email = req.user?.email.toLowerCase();
+    }
 
     const orders = await Order.find(filter).sort({ createdAt: -1 });
     res.json(orders);
@@ -21,10 +28,18 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 // GET single order by ID
-router.get('/:orderId', async (req: Request, res: Response) => {
+router.get('/:orderId', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const order = await Order.findOne({ orderId: req.params.orderId });
     if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    const canViewOrder =
+      req.user?.role === 'admin' ||
+      order.email.toLowerCase() === req.user?.email.toLowerCase();
+    if (!canViewOrder) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
     res.json(order);
   } catch (err: any) {
     res.status(500).json({ error: err.message });

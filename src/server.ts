@@ -4,6 +4,7 @@ import cors, { CorsOptions } from 'cors';
 import { connectToDatabase } from './lib/database.js';
 import categoryRoutes from './routes/categories.js';
 import productRoutes from './routes/products.js';
+import orderRoutes from './routes/orders.js';
 
 const app = express();
 
@@ -62,5 +63,6 @@ app.get('/api/health', async (_req: Request, res: Response) => {
 
 app.use('/api/categories', requireDatabaseConnection, categoryRoutes);
 app.use('/api/products', requireDatabaseConnection, productRoutes);
+app.use('/api/orders', requireDatabaseConnection, orderRoutes);
 
 export default app;
