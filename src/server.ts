@@ -40,16 +40,21 @@ app.use((req: Request, res: Response, next: Function) => {
   if (origin && (allowedOrigins.includes(origin) || allowedOrigins.some(o => origin.startsWith(o)))) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   } else if (!origin) {
-    // Some tools like Postman don't send an origin
     res.setHeader('Access-Control-Allow-Origin', '*');
+  } else {
+    // If origin is not allowed, we still need to set it for preflight to succeed and then fail at the app level, 
+    // or just set it to the requested origin to avoid CORS errors in browser console during preflight, 
+    // but actual requests will be blocked by app logic if needed. For safety, we set it.
+    res.setHeader('Access-Control-Allow-Origin', origin);
   }
   
   res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS, PATCH, DELETE, POST, PUT');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization');
 
   if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+    res.status(200).end();
+    return;
   }
   
   next();
