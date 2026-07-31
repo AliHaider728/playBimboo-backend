@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
+import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -76,6 +77,8 @@ const uploadImageBuffer = (file: Express.Multer.File) =>
 // POST Upload Single Image
 router.post(
   '/image',
+  authenticateToken,
+  requireAdmin,
   requireCloudinaryConfiguration,
   upload.single('image'),
   async (req: Request, res: Response) => {

@@ -9,6 +9,7 @@ import couponRoutes from './routes/coupons.js';
 import settingsRoutes from './routes/settings.js';
 import reviewRoutes from './routes/reviews.js';
 import authRoutes from './routes/auth.js';
+import uploadRoutes from './routes/upload.js';
 
 const app = express();
 
@@ -72,5 +73,6 @@ app.use('/api/coupons', requireDatabaseConnection, couponRoutes);
 app.use('/api/settings', requireDatabaseConnection, settingsRoutes);
 app.use('/api/reviews', requireDatabaseConnection, reviewRoutes);
 app.use('/api/auth', requireDatabaseConnection, authRoutes);
+app.use('/api/upload', uploadRoutes);
 
 export default app;
