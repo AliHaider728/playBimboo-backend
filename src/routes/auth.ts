@@ -2,10 +2,9 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
-import { authenticateToken, AuthRequest } from '../middleware/auth.js';
+import { authenticateToken, requireAdmin, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'playbimboo_secret_key_2026';
 
 // POST /api/auth/login (Admin & Customer Login)
 router.post('/login', async (req: Request, res: Response) => {
@@ -26,16 +25,23 @@ router.post('/login', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      console.error('JWT_SECRET is not configured');
+      return res.status(503).json({ error: 'Authentication is not configured' });
+    }
+
     const token = jwt.sign(
       { userId: user._id, email: user.email, role: user.role },
-      JWT_SECRET,
+      jwtSecret,
       { expiresIn: '7d' }
     );
 
+    const isProduction = process.env.NODE_ENV === 'production';
     res.cookie('pb_admin_token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
 
@@ -57,7 +63,12 @@ router.post('/login', async (req: Request, res: Response) => {
 
 // POST /api/auth/logout
 router.post('/logout', (req: Request, res: Response) => {
-  res.clearCookie('pb_admin_token');
+  const isProduction = process.env.NODE_ENV === 'production';
+  res.clearCookie('pb_admin_token', {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax'
+  });
   res.json({ message: 'Logged out successfully' });
 });
 
@@ -91,7 +102,7 @@ router.post('/wishlist', authenticateToken, async (req: AuthRequest, res: Respon
 });
 
 // GET /api/auth/users (Admin only - get all users)
-router.get('/users', authenticateToken, async (req: AuthRequest, res: Response) => {
+router.get('/users', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const users = await User.find().select('-passwordHash');
     res.json(users);

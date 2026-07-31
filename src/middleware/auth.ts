@@ -32,7 +32,12 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
     return res.status(401).json({ error: 'Authentication required. No token provided.' });
   }
 
-  const secret = process.env.JWT_SECRET || 'playbimboo_secret_key_2026';
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    console.error('JWT_SECRET is not configured');
+    return res.status(503).json({ error: 'Authentication is not configured' });
+  }
+
   jwt.verify(token, secret, (err: any, decoded: any) => {
     if (err) {
       return res.status(403).json({ error: 'Invalid or expired session token.' });
