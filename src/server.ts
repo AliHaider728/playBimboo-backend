@@ -7,6 +7,7 @@ import productRoutes from './routes/products.js';
 import orderRoutes from './routes/orders.js';
 import couponRoutes from './routes/coupons.js';
 import settingsRoutes from './routes/settings.js';
+import reviewRoutes from './routes/reviews.js';
 
 const app = express();
 
@@ -68,5 +69,6 @@ app.use('/api/products', requireDatabaseConnection, productRoutes);
 app.use('/api/orders', requireDatabaseConnection, orderRoutes);
 app.use('/api/coupons', requireDatabaseConnection, couponRoutes);
 app.use('/api/settings', requireDatabaseConnection, settingsRoutes);
+app.use('/api/reviews', requireDatabaseConnection, reviewRoutes);
 
 export default app;
