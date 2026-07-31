@@ -4,9 +4,9 @@
   "description": "Express + MongoDB API Backend for PlayBimboo Toy Store E-Commerce",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "tsx src/server.ts",
+    "dev": "tsx src/local.ts",
     "build": "tsc",
-    "start": "node dist/server.js"
+    "start": "node dist/local.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
