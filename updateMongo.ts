@@ -7,7 +7,7 @@ import Coupon from './src/models/Coupon';
 dotenv.config();
 
 async function run() {
-  await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/playbimboo');
+  await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/playbimboo');
   
   const products = await Product.find({});
   for (const p of products) {
