@@ -1,10 +1,11 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
-import Product from '../models/Product.js';
+import Product, { IProduct } from '../models/Product.js';
 import Category from '../models/Category.js';
-import Coupon from '../models/Coupon.js';
+import Coupon, { ICoupon } from '../models/Coupon.js';
 import Settings from '../models/Settings.js';
 import User from '../models/User.js';
+import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -80,7 +81,7 @@ const INITIAL_PRODUCTS = [
     ],
     description: 'Fuel your child’s space-age imagination with the Galaxy Explorer Cosmic Rocket Ship! Featuring 850+ precision interlocking pieces, LED cockpit accents, and poseable lunar rover appendages.',
     isVisible: true,
-    deliveryType: 'store_threshold',
+    deliveryType: 'store_threshold' as const,
     variants: [
       {
         id: 'var-color',
@@ -127,7 +128,7 @@ const INITIAL_PRODUCTS = [
     ],
     description: 'Introduce kids to basic programming logic! Uses color-coded line tracing and app-free button programming.',
     isVisible: true,
-    deliveryType: 'store_threshold',
+    deliveryType: 'store_threshold' as const,
     features: [
       'App-free block coding buttons',
       'Obstacle detection ultrasound sensor',
@@ -162,7 +163,7 @@ const INITIAL_PRODUCTS = [
     ],
     description: 'Ultra-soft, velvet hypoallergenic giant plush bear designed for endless hugs and cozy bedtime cuddles.',
     isVisible: true,
-    deliveryType: 'store_threshold',
+    deliveryType: 'store_threshold' as const,
     features: [
       '100% Cotton filler & velvet exterior',
       'Washable fabric',
@@ -196,7 +197,7 @@ const INITIAL_PRODUCTS = [
     ],
     description: 'Vibrant magnetic tiles that inspire endless creativity and develop spatial reasoning skills.',
     isVisible: true,
-    deliveryType: 'store_threshold',
+    deliveryType: 'store_threshold' as const,
     features: [
       '100 magnetic shapes in vibrant colors',
       'Strong, durable magnets',
@@ -230,7 +231,7 @@ const INITIAL_PRODUCTS = [
     ],
     description: 'A set of 5 highly detailed and poseable superhero action figures ready to save the day!',
     isVisible: true,
-    deliveryType: 'store_threshold',
+    deliveryType: 'store_threshold' as const,
     features: [
       '5 detailed action figures',
       'Multiple points of articulation',
@@ -264,7 +265,7 @@ const INITIAL_PRODUCTS = [
     ],
     description: 'Get kids exploring nature with this comprehensive outdoor kit including binoculars, compass, and magnifying glass.',
     isVisible: true,
-    deliveryType: 'store_threshold',
+    deliveryType: 'store_threshold' as const,
     features: [
       '4x30 Magnification Binoculars',
       'Lensatic Compass for navigation',
@@ -298,7 +299,7 @@ const INITIAL_PRODUCTS = [
     ],
     description: 'A beautifully crafted wooden chess set, perfect for learning strategy and critical thinking.',
     isVisible: true,
-    deliveryType: 'store_threshold',
+    deliveryType: 'store_threshold' as const,
     features: [
       'Foldable wooden board',
       'Hand-carved wooden pieces',
@@ -332,7 +333,7 @@ const INITIAL_PRODUCTS = [
     ],
     description: 'Build and paint your own glowing solar system model. Learn about astronomy in a fun, hands-on way!',
     isVisible: true,
-    deliveryType: 'store_threshold',
+    deliveryType: 'store_threshold' as const,
     features: [
       'Rotating planetarium stand',
       'Glow-in-the-dark paint included',
@@ -352,47 +353,76 @@ const INITIAL_PRODUCTS = [
 const INITIAL_COUPONS = [
   {
     code: 'BIMBOO10',
-    discountType: 'percentage',
+    discountType: 'percentage' as const,
     discountValue: 10,
     minPurchase: 1000,
     isActive: true
   },
   {
     code: 'PLAY500',
-    discountType: 'fixed',
+    discountType: 'fixed' as const,
     discountValue: 500,
     minPurchase: 4000,
     isActive: true
   }
 ];
 
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', authenticateToken, requireAdmin, async (_req: Request, res: Response) => {
   try {
-    await Product.deleteMany({});
-    await Category.deleteMany({});
-    await Coupon.deleteMany({});
-    await Settings.deleteMany({});
-    await User.deleteMany({});
+    const categoryResult = await Category.bulkWrite(
+      INITIAL_CATEGORIES.map((category) => ({
+        updateOne: {
+          filter: { slug: category.slug },
+          update: { $setOnInsert: category },
+          upsert: true
+        }
+      }))
+    );
+    const productResult = await Product.bulkWrite(
+      INITIAL_PRODUCTS.map((product) => ({
+        updateOne: {
+          filter: { slug: product.slug },
+          update: { $setOnInsert: product as unknown as Partial<IProduct> },
+          upsert: true
+        }
+      }))
+    );
+    const couponResult = await Coupon.bulkWrite(
+      INITIAL_COUPONS.map((coupon) => ({
+        updateOne: {
+          filter: { code: coupon.code },
+          update: { $setOnInsert: coupon as Partial<ICoupon> },
+          upsert: true
+        }
+      }))
+    );
 
-    await Category.insertMany(INITIAL_CATEGORIES);
-    await Product.insertMany(INITIAL_PRODUCTS);
-    await Coupon.insertMany(INITIAL_COUPONS);
-    await Settings.create({});
+    const settingsExist = Boolean(await Settings.exists({}));
+    if (!settingsExist) {
+      await Settings.create({});
+    }
 
-    // Seed Admin User
-    const adminPasswordHash = await bcrypt.hash('admin123', 10);
-    await User.create({
-      name: 'PlayBimboo Super Admin',
-      email: 'playbimboo@gmail.com',
-      passwordHash: adminPasswordHash,
-      role: 'admin'
-    });
+    const adminExists = Boolean(
+      await User.exists({ email: 'playbimboo@gmail.com' })
+    );
+    if (!adminExists) {
+      const adminPasswordHash = await bcrypt.hash('admin123', 10);
+      await User.create({
+        name: 'PlayBimboo Super Admin',
+        email: 'playbimboo@gmail.com',
+        passwordHash: adminPasswordHash,
+        role: 'admin'
+      });
+    }
 
     res.json({
-      message: 'Database successfully seeded with PlayBimboo PKR catalog data and Admin user!',
-      adminCredentials: {
-        email: 'playbimboo@gmail.com',
-        password: 'admin123'
+      message: 'Missing PlayBimboo setup records were added without changing existing data.',
+      recordsCreated: {
+        categories: categoryResult.upsertedCount,
+        products: productResult.upsertedCount,
+        coupons: couponResult.upsertedCount,
+        settings: settingsExist ? 0 : 1,
+        admin: adminExists ? 0 : 1
       }
     });
   } catch (err: any) {
