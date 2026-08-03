@@ -17,6 +17,24 @@ const logEmailFailure = (kind: string, orderId: string, error: unknown) => {
   console.error(`${kind} email failed for order ${orderId} (${getEmailFailureCode(error)}).`);
 };
 
+const sendAndTrackOrderConfirmation = async (order: any) => {
+  if (order.confirmationEmailSentAt) return;
+  try {
+    const confirmation = await sendOrderConfirmationEmail(order);
+    order.confirmationEmailSentAt = new Date();
+    order.confirmationEmailMessageId = confirmation.messageId;
+    order.confirmationEmailAccepted = confirmation.acceptedCount > 0;
+    order.confirmationEmailFailedAt = undefined;
+    order.confirmationEmailFailureCode = undefined;
+  } catch (error) {
+    order.confirmationEmailAccepted = false;
+    order.confirmationEmailFailedAt = new Date();
+    order.confirmationEmailFailureCode = getEmailFailureCode(error);
+    logEmailFailure('Order confirmation', order.orderId, error);
+  }
+  await order.save();
+};
+
 const parseVariantSelection = (selection?: string) =>
   new Map(
     String(selection || '')
@@ -113,8 +131,19 @@ router.get('/:orderId', authenticateToken, async (req: AuthRequest, res: Respons
 
 // POST Place New COD Order
 router.post('/', async (req: Request, res: Response) => {
+  const checkoutRequestId = typeof req.body?.checkoutRequestId === 'string'
+    ? req.body.checkoutRequestId.trim()
+    : '';
   try {
     const { customerName, email, phone, items, discountAmount, shippingAddress, appliedCoupon } = req.body;
+
+    if (checkoutRequestId && !/^[a-zA-Z0-9_-]{16,120}$/.test(checkoutRequestId)) {
+      return res.status(400).json({ error: 'Invalid checkout request identifier' });
+    }
+    if (checkoutRequestId) {
+      const existingOrder = await Order.findOne({ checkoutRequestId });
+      if (existingOrder) return res.status(200).json(existingOrder);
+    }
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Order must contain at least one product' });
@@ -207,7 +236,7 @@ router.post('/', async (req: Request, res: Response) => {
       computedSubtotal - safeDiscount + computedDeliveryCharge + taxAmount
     );
 
-    const orderId = `ORD-${Math.floor(10000 + Math.random() * 90000)}`;
+    const orderId = `ORD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
     const dateStr = new Date().toISOString().split('T')[0];
 
     const newOrder = new Order({
@@ -224,6 +253,7 @@ router.post('/', async (req: Request, res: Response) => {
       paymentMethod: 'Cash on Delivery (COD)',
       shippingAddress,
       appliedCoupon,
+      checkoutRequestId: checkoutRequestId || undefined,
       date: dateStr
     });
 
@@ -236,13 +266,15 @@ router.post('/', async (req: Request, res: Response) => {
       }
     }
 
-    // Send confirmation email asynchronously via Nodemailer
-    void sendOrderConfirmationEmail(newOrder).catch(error =>
-      logEmailFailure('Order confirmation', newOrder.orderId, error)
-    );
+    // The order remains valid if SMTP fails; only a sanitized failure state is persisted.
+    await sendAndTrackOrderConfirmation(newOrder);
 
     res.status(201).json(newOrder);
   } catch (err: any) {
+    if (checkoutRequestId && err?.code === 11000) {
+      const existingOrder = await Order.findOne({ checkoutRequestId });
+      if (existingOrder) return res.status(200).json(existingOrder);
+    }
     res.status(400).json({ error: err.message });
   }
 });

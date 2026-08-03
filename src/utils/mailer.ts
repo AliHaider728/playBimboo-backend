@@ -192,40 +192,91 @@ export const buildOrderDeliveredEmail = (order: any): EmailContent => {
 export const sendOrderDeliveredEmail = (order: any) =>
   sendEmail(String(order.email || ''), buildOrderDeliveredEmail(order));
 
-export const sendOrderConfirmationEmail = async (order: any) => {
+export const buildOrderConfirmationEmail = (order: any): EmailContent => {
   const items = Array.isArray(order.items) ? order.items : [];
-  const itemLines = items
-    .map((item: any) => `${String(item.name || 'Product')} × ${Math.max(1, Number(item.quantity) || 1)}`)
-    .join(', ');
-  const itemsHtml = items.map((item: any) => `
-    <tr>
-      <td style="padding:8px;border-bottom:1px solid #eee;">
-        ${item.image ? `<img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name || 'Product')}" width="50" style="border-radius:8px;" />` : ''}
-      </td>
-      <td style="padding:8px;border-bottom:1px solid #eee;">
-        <strong>${escapeHtml(item.name || 'Product')}</strong>
-        ${item.selectedVariant ? `(${escapeHtml(item.selectedVariant)})` : ''}
-        <br/><small style="color:#666;">Qty: ${Math.max(1, Number(item.quantity) || 1)}</small>
-      </td>
-      <td style="padding:8px;border-bottom:1px solid #eee;text-align:right;">
-        ${formatPkr((Number(item.price) || 0) * Math.max(1, Number(item.quantity) || 1))}
-      </td>
-    </tr>`).join('');
+  const itemLines = items.map((item: any) => {
+    const quantity = Math.max(1, Number(item.quantity) || 1);
+    const variant = item.selectedVariant ? ` (${String(item.selectedVariant)})` : '';
+    return `${String(item.name || 'PlayBimboo product')}${variant} x ${quantity} at ${formatPkr(item.price)}`;
+  }).join('\n');
+  const itemsHtml = items.map((item: any) => {
+    const quantity = Math.max(1, Number(item.quantity) || 1);
+    const itemPrice = Number(item.price) || 0;
+    const variant = item.selectedVariant
+      ? `<div style="color:#64748b;font-size:12px;margin-top:4px;">${escapeHtml(item.selectedVariant)}</div>`
+      : '';
+    return `<tr>
+      <td style="padding:13px 0;border-bottom:1px solid #e2e8f0;"><strong style="color:#0f172a;">${escapeHtml(item.name || 'PlayBimboo product')}</strong>${variant}</td>
+      <td style="padding:13px 8px;border-bottom:1px solid #e2e8f0;text-align:center;color:#475569;">${quantity}</td>
+      <td style="padding:13px 8px;border-bottom:1px solid #e2e8f0;text-align:right;color:#475569;">${formatPkr(itemPrice)}</td>
+      <td style="padding:13px 0;border-bottom:1px solid #e2e8f0;text-align:right;color:#0f172a;font-weight:700;">${formatPkr(itemPrice * quantity)}</td>
+    </tr>`;
+  }).join('');
   const address = order.shippingAddress || {};
-  const content: EmailContent = {
-    subject: `Order Confirmation #${String(order.orderId || 'Order')} - PlayBimboo`,
-    html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;padding:24px;border-radius:16px;border:1px solid #eaeaea;">
-      <div style="text-align:center;margin-bottom:20px;"><h1 style="color:#f43f5e;margin:0;">PlayBimboo</h1><p style="color:#64748b;font-size:14px;">Order Confirmation #${escapeHtml(order.orderId || 'Order')}</p></div>
-      <p>Hi <strong>${escapeHtml(order.customerName || 'Customer')}</strong>,</p>
-      <p>Thank you for shopping at PlayBimboo! Your Cash on Delivery order has been received and is being prepared with care.</p>
-      <div style="background:#f8fafc;padding:16px;border-radius:12px;margin:20px 0;"><h3 style="margin-top:0;color:#0f172a;">Order Details</h3><table style="width:100%;border-collapse:collapse;">${itemsHtml}</table><hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0;"/><p style="text-align:right;"><strong>Delivery Fee:</strong> ${formatPkr(order.deliveryCharge)}</p><p style="text-align:right;"><strong>Discount:</strong> -${formatPkr(order.discountAmount)}</p><h3 style="text-align:right;color:#e11d48;">Total (COD): ${formatPkr(order.total)}</h3></div>
-      <div style="background:#eff6ff;padding:16px;border-radius:12px;margin:20px 0;"><h4 style="margin:0 0 8px;color:#1e40af;">Shipping Address</h4><p style="margin:0;color:#334155;">${escapeHtml(address.fullName || order.customerName || 'Customer')}</p><p style="margin:0;color:#334155;">${escapeHtml(address.street || '')}, ${escapeHtml(address.city || '')}, ${escapeHtml(address.state || '')} ${escapeHtml(address.postalCode || '')}</p><p style="margin:4px 0 0;color:#334155;">Phone: ${escapeHtml(address.phone || order.phone || '')}</p></div>
-      <p style="font-size:12px;color:#94a3b8;text-align:center;margin-top:30px;">Cancellation requests are accepted within 24 hours. Support: support@playbimboo.com.</p>
-    </div>`,
-    text: `PlayBimboo order #${String(order.orderId || 'Order')} confirmed. ${itemLines}. Total: ${formatPkr(order.total)}. Support: support@playbimboo.com.`
-  };
-  return sendEmail(String(order.email || ''), content);
+  const fullAddress = [address.street, address.city, address.state, address.postalCode, address.country]
+    .map(value => String(value || '').trim())
+    .filter(Boolean)
+    .join(', ');
+  const customerName = String(order.customerName || address.fullName || 'Customer');
+  const orderId = String(order.orderId || 'Order');
+  const orderDate = formatDeliveryDate(order.createdAt || order.date || new Date());
+  const paymentMethod = String(order.paymentMethod || 'Cash on Delivery (COD)');
+  const orderStatus = String(order.status || 'Pending');
+  const contactPhone = String(address.phone || order.phone || '').trim();
+  const discount = Math.max(0, Number(order.discountAmount) || 0);
+  const discountHtml = discount > 0
+    ? `<tr><td style="padding:5px 0;color:#64748b;">Discount</td><td style="padding:5px 0;text-align:right;color:#15803d;font-weight:700;">-${formatPkr(discount)}</td></tr>`
+    : '';
+  const subject = `Your PlayBimboo Order Is Confirmed - ${orderId}`;
+  const html = `<!doctype html>
+  <html lang="en"><body style="margin:0;background:#f8fafc;font-family:Arial,sans-serif;color:#334155;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8fafc;padding:24px 12px;"><tr><td align="center">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #e2e8f0;border-radius:20px;overflow:hidden;">
+        <tr><td style="background:#0f172a;padding:28px;text-align:center;">
+          <div style="display:inline-block;background:#fbbf24;color:#0f172a;font-weight:900;font-size:20px;padding:10px 12px;border-radius:12px;">PB</div>
+          <h1 style="color:#ffffff;font-size:26px;margin:14px 0 4px;">PlayBimboo</h1><p style="color:#cbd5e1;margin:0;font-size:14px;">Happy playtime starts here</p>
+        </td></tr>
+        <tr><td style="padding:32px 28px;">
+          <h2 style="color:#0f172a;font-size:24px;margin:0 0 16px;">Your order is confirmed!</h2>
+          <p style="margin:0 0 12px;line-height:1.6;">Hi <strong>${escapeHtml(customerName)}</strong>,</p>
+          <p style="margin:0 0 20px;line-height:1.6;">Thank you for shopping with PlayBimboo. We have received order <strong>#${escapeHtml(orderId)}</strong> placed on <strong>${escapeHtml(orderDate)}</strong>.</p>
+          <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:14px;padding:16px;margin-bottom:22px;"><strong style="color:#1d4ed8;">What happens next?</strong><div style="color:#1e40af;font-size:13px;line-height:1.5;margin-top:4px;">Our team will contact you to confirm the order before it is dispatched.</div></div>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom:20px;background:#f8fafc;border-radius:12px;padding:12px;">
+            <tr><td style="padding:5px;color:#64748b;">Order number</td><td style="padding:5px;text-align:right;font-weight:700;color:#0f172a;">${escapeHtml(orderId)}</td></tr>
+            <tr><td style="padding:5px;color:#64748b;">Order date</td><td style="padding:5px;text-align:right;font-weight:700;color:#0f172a;">${escapeHtml(orderDate)}</td></tr>
+            <tr><td style="padding:5px;color:#64748b;">Status</td><td style="padding:5px;text-align:right;font-weight:700;color:#b45309;">${escapeHtml(orderStatus)}</td></tr>
+            <tr><td style="padding:5px;color:#64748b;">Payment</td><td style="padding:5px;text-align:right;font-weight:700;color:#0f172a;">${escapeHtml(paymentMethod)}</td></tr>
+          </table>
+          <h3 style="color:#0f172a;font-size:16px;margin:0 0 8px;">Order summary</h3>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;"><tr style="color:#64748b;font-size:11px;text-transform:uppercase;"><th align="left" style="padding-bottom:8px;">Product</th><th style="padding-bottom:8px;">Qty</th><th align="right" style="padding-bottom:8px;">Price</th><th align="right" style="padding-bottom:8px;">Amount</th></tr>${itemsHtml}</table>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:16px 0 24px;">
+            <tr><td style="padding:5px 0;color:#64748b;">Subtotal</td><td style="padding:5px 0;text-align:right;font-weight:700;">${formatPkr(order.subtotal)}</td></tr>
+            <tr><td style="padding:5px 0;color:#64748b;">Delivery charges</td><td style="padding:5px 0;text-align:right;font-weight:700;">${formatPkr(order.deliveryCharge)}</td></tr>${discountHtml}
+            <tr><td style="padding:10px 0 0;color:#0f172a;font-size:17px;font-weight:800;">Final total</td><td style="padding:10px 0 0;text-align:right;color:#e11d48;font-size:19px;font-weight:900;">${formatPkr(order.total)}</td></tr>
+          </table>
+          <div style="background:#f8fafc;border-radius:14px;padding:16px;margin-bottom:22px;"><h3 style="color:#0f172a;font-size:16px;margin:0 0 8px;">Delivery address</h3><p style="margin:0;line-height:1.6;color:#334155;"><strong>${escapeHtml(address.fullName || customerName)}</strong><br/>${escapeHtml(fullAddress)}${contactPhone ? `<br/>Phone: ${escapeHtml(contactPhone)}` : ''}</p></div>
+          <p style="line-height:1.6;margin:0 0 12px;">Questions about your order? Reply to this email or contact <a href="mailto:support@playbimboo.com" style="color:#e11d48;">support@playbimboo.com</a>.</p><p style="line-height:1.6;margin:0;">Thank you for choosing PlayBimboo!</p>
+        </td></tr>
+        <tr><td style="background:#f8fafc;padding:18px 28px;text-align:center;color:#94a3b8;font-size:12px;">PlayBimboo Toys &middot; Customer Support: support@playbimboo.com</td></tr>
+      </table>
+    </td></tr></table>
+  </body></html>`;
+  const text = [
+    'PlayBimboo - Your order is confirmed!', `Hi ${customerName},`,
+    `Order #${orderId} was placed on ${orderDate}.`, `Status: ${orderStatus}`, `Payment: ${paymentMethod}`,
+    `Products:\n${itemLines || 'PlayBimboo product'}`, `Subtotal: ${formatPkr(order.subtotal)}`,
+    `Delivery charges: ${formatPkr(order.deliveryCharge)}`,
+    ...(discount > 0 ? [`Discount: -${formatPkr(discount)}`] : []),
+    `Final total: ${formatPkr(order.total)}`,
+    `Delivery address: ${String(address.fullName || customerName)}, ${fullAddress}${contactPhone ? `, Phone: ${contactPhone}` : ''}`,
+    'Our team will contact you to confirm the order before it is dispatched.',
+    'Need help? Reply to this email or contact support@playbimboo.com.'
+  ].join('\n\n');
+  return { subject, html, text };
 };
+
+export const sendOrderConfirmationEmail = (order: any) =>
+  sendEmail(String(order.email || ''), buildOrderConfirmationEmail(order));
 
 export const sendOrderStatusEmail = async (order: any) => {
   const content: EmailContent = {

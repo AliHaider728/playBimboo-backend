@@ -16,6 +16,7 @@ export interface IShippingAddress {
   state: string;
   postalCode: string;
   phone: string;
+  country?: string;
 }
 
 export interface IOrder extends Document {
@@ -33,7 +34,13 @@ export interface IOrder extends Document {
   shippingAddress: IShippingAddress;
   trackingNumber?: string;
   appliedCoupon?: string;
+  checkoutRequestId?: string;
   date: string;
+  confirmationEmailSentAt?: Date;
+  confirmationEmailMessageId?: string;
+  confirmationEmailAccepted?: boolean;
+  confirmationEmailFailedAt?: Date;
+  confirmationEmailFailureCode?: string;
   deliveredAt?: Date;
   deliveredEmailSentAt?: Date;
   deliveredEmailMessageId?: string;
@@ -75,11 +82,18 @@ const OrderSchema = new Schema<IOrder>(
       city: String,
       state: String,
       postalCode: String,
-      phone: String
+      phone: String,
+      country: String
     },
     trackingNumber: { type: String },
     appliedCoupon: { type: String },
+    checkoutRequestId: { type: String, trim: true, maxlength: 120, unique: true, sparse: true },
     date: { type: String },
+    confirmationEmailSentAt: { type: Date },
+    confirmationEmailMessageId: { type: String, maxlength: 500 },
+    confirmationEmailAccepted: { type: Boolean },
+    confirmationEmailFailedAt: { type: Date },
+    confirmationEmailFailureCode: { type: String, maxlength: 100 },
     deliveredAt: { type: Date },
     deliveredEmailSentAt: { type: Date },
     deliveredEmailMessageId: { type: String, maxlength: 500 },
