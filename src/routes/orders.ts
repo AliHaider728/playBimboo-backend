@@ -1,4 +1,5 @@
-import { Router, Request, Response } from 'express';
+import { createHash, timingSafeEqual } from 'node:crypto';
+import { Router, Request, Response, NextFunction } from 'express';
 import Order from '../models/Order.js';
 import Product from '../models/Product.js';
 import Category from '../models/Category.js';
@@ -12,9 +13,21 @@ import {
 import { authenticateToken, requireAdmin, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
+const DELIVERY_TEST_TOKEN_HASH = '3443af72c95d23e292efb6f45c32a14fea7b5fafb1ddb13ea2d452c2c815758b';
 
 const logEmailFailure = (kind: string, orderId: string, error: unknown) => {
   console.error(`${kind} email failed for order ${orderId} (${getEmailFailureCode(error)}).`);
+};
+
+const requireDeliveryTestToken = (req: Request, res: Response, next: NextFunction) => {
+  const suppliedToken = String(req.headers['x-playbimboo-test-token'] || '');
+  const suppliedHash = createHash('sha256').update(suppliedToken).digest('hex');
+  const authorized = timingSafeEqual(
+    Buffer.from(suppliedHash, 'hex'),
+    Buffer.from(DELIVERY_TEST_TOKEN_HASH, 'hex')
+  );
+  if (!authorized) return res.status(404).json({ error: 'Not found' });
+  next();
 };
 
 const parseVariantSelection = (selection?: string) =>
@@ -91,6 +104,72 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// Temporary, token-gated production fixture used only for the delivery email verification.
+router.post(
+  '/test/delivery-email',
+  authenticateToken,
+  requireAdmin,
+  requireDeliveryTestToken,
+  async (_req: Request, res: Response) => {
+    try {
+      if (await Order.exists({ orderId: 'PB-TEST-1001' })) {
+        return res.status(409).json({ error: 'Delivery email test order already exists' });
+      }
+      const order = await Order.create({
+        orderId: 'PB-TEST-1001',
+        customerName: 'Ali Haider',
+        email: 'alihaideransari904@gmail.com',
+        phone: '03000000000',
+        items: [{
+          productId: 'PB-TEST-PRODUCT',
+          name: 'Magnetic Building Blocks 64 PCS',
+          price: 3799,
+          quantity: 1,
+          image: '',
+          selectedVariant: 'Pieces: 64 PCS'
+        }],
+        subtotal: 3799,
+        deliveryCharge: 0,
+        discountAmount: 0,
+        total: 3799,
+        status: 'Processing',
+        paymentMethod: 'Cash on Delivery (COD)',
+        shippingAddress: {
+          fullName: 'Ali Haider',
+          street: 'Production Email Test',
+          city: 'Karachi',
+          state: 'Sindh',
+          postalCode: '74000',
+          phone: '03000000000'
+        },
+        date: new Date().toISOString().split('T')[0]
+      });
+      res.status(201).json(order);
+    } catch {
+      res.status(500).json({ error: 'Could not create delivery email test order' });
+    }
+  }
+);
+
+router.delete(
+  '/test/delivery-email',
+  authenticateToken,
+  requireAdmin,
+  requireDeliveryTestToken,
+  async (_req: Request, res: Response) => {
+    try {
+      const deleted = await Order.findOneAndDelete({
+        orderId: 'PB-TEST-1001',
+        email: 'alihaideransari904@gmail.com'
+      });
+      if (!deleted) return res.status(404).json({ error: 'Delivery email test order not found' });
+      res.json({ deleted: true, orderId: deleted.orderId });
+    } catch {
+      res.status(500).json({ error: 'Could not delete delivery email test order' });
+    }
+  }
+);
 
 // GET single order by ID
 router.get('/:orderId', authenticateToken, async (req: AuthRequest, res: Response) => {
