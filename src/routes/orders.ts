@@ -1,5 +1,4 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Request, Response } from 'express';
 import Order from '../models/Order.js';
 import Product from '../models/Product.js';
 import Category from '../models/Category.js';
@@ -13,7 +12,6 @@ import {
 import { authenticateToken, requireAdmin, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
-const CONFIRMATION_TEST_TOKEN_HASH = '3efa27e9f7635e3b456517306fca929aeaf9bfcc189eac8caf7c87547e07883f';
 
 const logEmailFailure = (kind: string, orderId: string, error: unknown) => {
   console.error(`${kind} email failed for order ${orderId} (${getEmailFailureCode(error)}).`);
@@ -35,17 +33,6 @@ const sendAndTrackOrderConfirmation = async (order: any) => {
     logEmailFailure('Order confirmation', order.orderId, error);
   }
   await order.save();
-};
-
-const requireConfirmationTestToken = (req: Request, res: Response, next: NextFunction) => {
-  const suppliedToken = String(req.headers['x-playbimboo-test-token'] || '');
-  const suppliedHash = createHash('sha256').update(suppliedToken).digest('hex');
-  const authorized = timingSafeEqual(
-    Buffer.from(suppliedHash, 'hex'),
-    Buffer.from(CONFIRMATION_TEST_TOKEN_HASH, 'hex')
-  );
-  if (!authorized) return res.status(404).json({ error: 'Not found' });
-  next();
 };
 
 const parseVariantSelection = (selection?: string) =>
@@ -122,28 +109,6 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: err.message });
   }
 });
-
-// Temporary cleanup for the uniquely marked production confirmation-email fixture.
-router.delete(
-  '/test/confirmation-email/:orderId',
-  authenticateToken,
-  requireAdmin,
-  requireConfirmationTestToken,
-  async (req: Request, res: Response) => {
-    try {
-      const deleted = await Order.findOneAndDelete({
-        orderId: req.params.orderId,
-        email: 'alihaideransari904@gmail.com',
-        checkoutRequestId: /^pb_confirmation_e2e_/,
-        appliedCoupon: 'PB-CONFIRMATION-E2E'
-      });
-      if (!deleted) return res.status(404).json({ error: 'Confirmation email test order not found' });
-      res.json({ deleted: true, orderId: deleted.orderId });
-    } catch {
-      res.status(500).json({ error: 'Could not delete confirmation email test order' });
-    }
-  }
-);
 
 // GET single order by ID
 router.get('/:orderId', authenticateToken, async (req: AuthRequest, res: Response) => {
