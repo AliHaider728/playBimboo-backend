@@ -5,6 +5,11 @@ import csvParser from 'csv-parser';
 import { Parser } from 'json2csv';
 import { Readable } from 'node:stream';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
+import {
+  deleteProductImages,
+  hasCloudinaryConfiguration,
+  isProductImagePublicId
+} from '../lib/cloudinary.js';
 
 const router = Router();
 const upload = multer({
@@ -130,6 +135,39 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
     : [];
   if (images.length === 0) throw new Error('A main product image is required');
   if (images.length > 9) throw new Error('A product can have one main image and up to 8 gallery images');
+  if (images.some((image: string) => {
+    try {
+      return new URL(image).protocol !== 'https:';
+    } catch {
+      return true;
+    }
+  })) {
+    throw new Error('Product image URLs must use secure HTTPS URLs');
+  }
+
+  const existingPublicIdsByUrl = new Map<string, string>();
+  if (Array.isArray(current?.images) && Array.isArray(current?.imagePublicIds)) {
+    current.images.forEach((image: unknown, index: number) => {
+      const publicId = current.imagePublicIds[index];
+      if (typeof image === 'string' && typeof publicId === 'string' && publicId) {
+        existingPublicIdsByUrl.set(image, publicId);
+      }
+    });
+  }
+  const submittedPublicIds = Array.isArray(body.imagePublicIds) ? body.imagePublicIds : undefined;
+  const imagePublicIds = images.map((image: string, index: number) => {
+    const submitted = submittedPublicIds?.[index];
+    const publicId = typeof submitted === 'string'
+      ? submitted.trim()
+      : existingPublicIdsByUrl.get(image) || '';
+    if (publicId && !isProductImagePublicId(publicId)) {
+      throw new Error('Invalid PlayBimboo product image public ID');
+    }
+    if (publicId && new URL(image).hostname !== 'res.cloudinary.com') {
+      throw new Error('Cloudinary public IDs must be paired with Cloudinary HTTPS URLs');
+    }
+    return publicId;
+  });
 
   const deliveryType = merged.deliveryType || 'store_threshold';
   if (!['store_threshold', 'category', 'fixed', 'free', 'none'].includes(deliveryType)) {
@@ -199,6 +237,7 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
     stockQuantity,
     lowStockThreshold,
     images,
+    imagePublicIds,
     shortDescription: sanitizePlainText(merged.shortDescription, 300),
     description,
     isVisible: merged.isVisible !== false,
@@ -343,8 +382,18 @@ router.put('/:id', authenticateToken, requireAdmin, async (req: Request, res: Re
 
     const payload = normalizeProductPayload(req.body, product.toObject());
     await assertUniqueIdentifiers(payload, product.id);
+    const oldPublicIds = (product.imagePublicIds || []).filter(Boolean);
+    const removedPublicIds = oldPublicIds.filter(
+      publicId => !payload.imagePublicIds.includes(publicId)
+    );
+    if (removedPublicIds.length > 0 && !hasCloudinaryConfiguration) {
+      return res.status(503).json({
+        error: 'Cannot replace or remove product images because Cloudinary is not configured.'
+      });
+    }
     product.set(payload);
     await product.save();
+    if (removedPublicIds.length > 0) await deleteProductImages(removedPublicIds);
     res.json(product);
   } catch (err: any) {
     const isConflict = err?.code === 11000 || /already used|unique/i.test(err.message);
@@ -355,8 +404,16 @@ router.put('/:id', authenticateToken, requireAdmin, async (req: Request, res: Re
 // DELETE Product
 router.delete('/:id', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
-    const deleted = await Product.findByIdAndDelete(req.params.id);
-    if (!deleted) return res.status(404).json({ error: 'Product not found' });
+    const product = await Product.findById(req.params.id);
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+    const publicIds = (product.imagePublicIds || []).filter(Boolean);
+    if (publicIds.length > 0 && !hasCloudinaryConfiguration) {
+      return res.status(503).json({
+        error: 'Cannot delete this product because Cloudinary image cleanup is not configured.'
+      });
+    }
+    await product.deleteOne();
+    if (publicIds.length > 0) await deleteProductImages(publicIds);
     res.json({ message: 'Product deleted successfully' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

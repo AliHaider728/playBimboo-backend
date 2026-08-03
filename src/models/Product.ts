@@ -31,6 +31,7 @@ export interface IProduct extends Document {
   inStock: boolean;
   stockQuantity: number;
   images: string[];
+  imagePublicIds: string[];
   shortDescription?: string;
   description: string;
   isVisible: boolean;
@@ -72,6 +73,14 @@ const ProductSchema = new Schema<IProduct>(
       validate: {
         validator: (images: string[]) => images.length <= 9,
         message: 'A product can have one main image and up to 8 gallery images'
+      }
+    },
+    imagePublicIds: {
+      type: [{ type: String }],
+      default: [],
+      validate: {
+        validator: (publicIds: string[]) => publicIds.length <= 9,
+        message: 'A product can have at most 9 Cloudinary image public IDs'
       }
     },
     shortDescription: { type: String, maxlength: 300 },

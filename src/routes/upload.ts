@@ -1,23 +1,13 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
-import { v2 as cloudinary } from 'cloudinary';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
+import {
+  deleteProductImage,
+  hasCloudinaryConfiguration,
+  uploadProductImage
+} from '../lib/cloudinary.js';
 
 const router = Router();
-
-const hasCloudinary = Boolean(
-  process.env.CLOUDINARY_CLOUD_NAME &&
-  process.env.CLOUDINARY_API_KEY &&
-  process.env.CLOUDINARY_API_SECRET
-);
-
-if (hasCloudinary) {
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET
-  });
-}
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -37,7 +27,7 @@ const requireCloudinaryConfiguration = (
   res: Response,
   next: NextFunction
 ) => {
-  if (!hasCloudinary) {
+  if (!hasCloudinaryConfiguration) {
     return res.status(503).json({
       error:
         'Image uploads are unavailable because Cloudinary is not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET.'
@@ -46,34 +36,6 @@ const requireCloudinaryConfiguration = (
 
   next();
 };
-
-const uploadImageBuffer = (file: Express.Multer.File) =>
-  new Promise<{ url: string; publicId: string }>((resolve, reject) => {
-    const uploadStream = cloudinary.uploader.upload_stream(
-      {
-        folder: 'playbimboo_products',
-        resource_type: 'image'
-      },
-      (error, result) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-
-        if (!result) {
-          reject(new Error('Cloudinary returned no upload result'));
-          return;
-        }
-
-        resolve({
-          url: result.secure_url,
-          publicId: result.public_id
-        });
-      }
-    );
-
-    uploadStream.end(file.buffer);
-  });
 
 // POST Upload Single Image
 router.post(
@@ -88,16 +50,44 @@ router.post(
     }
 
     try {
-      const result = await uploadImageBuffer(req.file);
+      const result = await uploadProductImage(req.file);
       res.json({
         url: result.url,
+        secureUrl: result.url,
+        publicId: result.publicId,
         filename: result.publicId,
         mimetype: req.file.mimetype,
         size: req.file.size
       });
-    } catch (error: any) {
-      console.error('Cloudinary image upload failed:', error);
+    } catch {
+      console.error('Cloudinary image upload failed.');
       res.status(502).json({ error: 'Cloudinary image upload failed' });
+    }
+  }
+);
+
+// DELETE a newly uploaded image that was discarded before the product was saved
+router.delete(
+  '/image',
+  authenticateToken,
+  requireAdmin,
+  requireCloudinaryConfiguration,
+  async (req: Request, res: Response) => {
+    const publicId = typeof req.body?.publicId === 'string' ? req.body.publicId.trim() : '';
+    if (!publicId) return res.status(400).json({ error: 'Cloudinary public ID is required' });
+
+    try {
+      const result = await deleteProductImage(publicId);
+      if (!['ok', 'not found'].includes(result.result)) {
+        return res.status(502).json({ error: 'Cloudinary did not confirm image deletion' });
+      }
+      res.json({ deleted: true });
+    } catch (error) {
+      console.error('Cloudinary image deletion failed.');
+      const message = error instanceof Error && error.message.startsWith('Invalid PlayBimboo')
+        ? error.message
+        : 'Cloudinary image deletion failed';
+      res.status(message.startsWith('Invalid') ? 400 : 502).json({ error: message });
     }
   }
 );
