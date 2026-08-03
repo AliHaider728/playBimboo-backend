@@ -3,10 +3,19 @@ import Order from '../models/Order.js';
 import Product from '../models/Product.js';
 import Category from '../models/Category.js';
 import Settings from '../models/Settings.js';
-import { sendOrderConfirmationEmail, sendOrderStatusEmail } from '../utils/mailer.js';
+import {
+  getEmailFailureCode,
+  sendOrderConfirmationEmail,
+  sendOrderDeliveredEmail,
+  sendOrderStatusEmail
+} from '../utils/mailer.js';
 import { authenticateToken, requireAdmin, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
+
+const logEmailFailure = (kind: string, orderId: string, error: unknown) => {
+  console.error(`${kind} email failed for order ${orderId} (${getEmailFailureCode(error)}).`);
+};
 
 const parseVariantSelection = (selection?: string) =>
   new Map(
@@ -228,7 +237,9 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     // Send confirmation email asynchronously via Nodemailer
-    sendOrderConfirmationEmail(newOrder).catch(console.error);
+    void sendOrderConfirmationEmail(newOrder).catch(error =>
+      logEmailFailure('Order confirmation', newOrder.orderId, error)
+    );
 
     res.status(201).json(newOrder);
   } catch (err: any) {
@@ -265,7 +276,9 @@ router.post('/:orderId/cancel', async (req: Request, res: Response) => {
       }
     }
 
-    sendOrderStatusEmail(order).catch(console.error);
+    void sendOrderStatusEmail(order).catch(error =>
+      logEmailFailure('Order status', order.orderId, error)
+    );
 
     res.json({ message: 'Order successfully cancelled within 24h window', order });
   } catch (err: any) {
@@ -277,15 +290,50 @@ router.post('/:orderId/cancel', async (req: Request, res: Response) => {
 router.put('/:orderId/status', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { status } = req.body;
-    const order = await Order.findOneAndUpdate(
+    const validStatuses = ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Invalid order status' });
+    }
+
+    const previousOrder = await Order.findOneAndUpdate(
       { orderId: req.params.orderId },
       { status },
-      { new: true }
+      { new: false, runValidators: true }
     );
 
+    if (!previousOrder) return res.status(404).json({ error: 'Order not found' });
+    const order = await Order.findById(previousOrder.id);
     if (!order) return res.status(404).json({ error: 'Order not found' });
 
-    sendOrderStatusEmail(order).catch(console.error);
+    const statusChanged = previousOrder.status !== status;
+    const transitionedToDelivered = statusChanged && status === 'Delivered';
+
+    if (transitionedToDelivered) {
+      order.deliveredAt = new Date();
+      await order.save();
+
+      if (!order.deliveredEmailSentAt) {
+        try {
+          const delivery = await sendOrderDeliveredEmail(order);
+          order.deliveredEmailSentAt = new Date();
+          order.deliveredEmailMessageId = delivery.messageId;
+          order.deliveredEmailAccepted = delivery.acceptedCount > 0;
+          order.deliveredEmailFailedAt = undefined;
+          order.deliveredEmailFailureCode = undefined;
+        } catch (error) {
+          const failureCode = getEmailFailureCode(error);
+          order.deliveredEmailAccepted = false;
+          order.deliveredEmailFailedAt = new Date();
+          order.deliveredEmailFailureCode = failureCode;
+          logEmailFailure('Delivered order', order.orderId, error);
+        }
+        await order.save();
+      }
+    } else if (statusChanged) {
+      void sendOrderStatusEmail(order).catch(error =>
+        logEmailFailure('Order status', order.orderId, error)
+      );
+    }
 
     res.json(order);
   } catch (err: any) {

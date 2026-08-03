@@ -34,6 +34,12 @@ export interface IOrder extends Document {
   trackingNumber?: string;
   appliedCoupon?: string;
   date: string;
+  deliveredAt?: Date;
+  deliveredEmailSentAt?: Date;
+  deliveredEmailMessageId?: string;
+  deliveredEmailAccepted?: boolean;
+  deliveredEmailFailedAt?: Date;
+  deliveredEmailFailureCode?: string;
   createdAt: Date;
 }
 
@@ -73,7 +79,13 @@ const OrderSchema = new Schema<IOrder>(
     },
     trackingNumber: { type: String },
     appliedCoupon: { type: String },
-    date: { type: String }
+    date: { type: String },
+    deliveredAt: { type: Date },
+    deliveredEmailSentAt: { type: Date },
+    deliveredEmailMessageId: { type: String, maxlength: 500 },
+    deliveredEmailAccepted: { type: Boolean },
+    deliveredEmailFailedAt: { type: Date },
+    deliveredEmailFailureCode: { type: String, maxlength: 100 }
   },
   { timestamps: true }
 );
