@@ -22,8 +22,9 @@ if (hasCloudinary) {
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
+  fileFilter: (_req, file, cb) => {
+    const acceptedTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+    if (acceptedTypes.has(file.mimetype)) {
       cb(null, true);
     } else {
       cb(new Error('Only image files (JPG, PNG, WEBP) are allowed'));
@@ -100,5 +101,17 @@ router.post(
     }
   }
 );
+
+router.use((error: unknown, _req: Request, res: Response, next: NextFunction) => {
+  if (error instanceof multer.MulterError) {
+    return res.status(400).json({
+      error: error.code === 'LIMIT_FILE_SIZE' ? 'Image exceeds the 5MB size limit' : error.message
+    });
+  }
+  if (error instanceof Error && error.message.startsWith('Only image files')) {
+    return res.status(400).json({ error: error.message });
+  }
+  next(error);
+});
 
 export default router;
