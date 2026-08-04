@@ -43,8 +43,75 @@ const sharedAllowedTags = [
   'tr', 'th', 'td', 'blockquote', 'a', 'img', 'br', 'hr'
 ];
 
+const decodeEscapedHtml = (value: string) => {
+  if (!/&lt;\/?(?:!doctype|html|head|body|section|div|h[1-6]|p|table|ul|ol)\b/i.test(value)) {
+    return value;
+  }
+  return value
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#(?:39|x27);/gi, "'")
+    .replace(/&amp;/gi, '&');
+};
+
+export const extractProductHtmlFragment = (value: unknown, maxLength = 30000) => {
+  let html = decodeEscapedHtml(String(value ?? '').slice(0, maxLength));
+  html = html
+    .replace(/<!doctype[^>]*>/gi, '')
+    .replace(/<!--(?:.|[\r\n])*?-->/g, '')
+    .replace(/<(head|script|style|iframe|object|embed|form|template|svg|math)\b[^>]*>[\s\S]*?<\/\1>/gi, '')
+    .replace(/<(meta|link|base|title)\b[^>]*\/?\s*>/gi, '');
+  const body = html.match(/<body\b[^>]*>([\s\S]*?)<\/body\s*>/i);
+  if (body) html = body[1];
+  return html
+    .replace(/<\/?(?:html|head|body)\b[^>]*>/gi, '')
+    .trim();
+};
+
+export const sanitizeProductDescription = (value: unknown, maxLength = 30000) =>
+  sanitizeHtml(extractProductHtmlFragment(value, maxLength), {
+    allowedTags: [
+      'div', 'section', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span',
+      'strong', 'b', 'em', 'i', 'u', 's', 'ul', 'ol', 'li', 'table', 'thead',
+      'tbody', 'tfoot', 'tr', 'th', 'td', 'blockquote', 'a', 'img', 'figure',
+      'figcaption', 'br', 'hr'
+    ],
+    allowedAttributes: {
+      a: ['href', 'target', 'rel'],
+      img: ['src', 'alt', 'title', 'width', 'height', 'loading'],
+      th: ['colspan', 'rowspan', 'scope'],
+      td: ['colspan', 'rowspan']
+    },
+    allowedSchemes: ['http', 'https', 'mailto'],
+    allowedSchemesByTag: { img: ['https'], a: ['http', 'https', 'mailto'] },
+    allowProtocolRelative: false,
+    disallowedTagsMode: 'discard',
+    exclusiveFilter: frame =>
+      frame.tag === 'img' && !/^https:\/\//i.test(frame.attribs.src || ''),
+    transformTags: {
+      a: (_tagName, attribs) => ({
+        tagName: 'a',
+        attribs: {
+          href: attribs.href || '#',
+          ...(attribs.target === '_blank' ? { target: '_blank' } : {}),
+          rel: 'noopener noreferrer'
+        }
+      }),
+      img: (_tagName, attribs) => ({
+        tagName: 'img',
+        attribs: {
+          src: attribs.src || '',
+          alt: cleanText(attribs.alt, 180),
+          ...(attribs.title ? { title: cleanText(attribs.title, 180) } : {}),
+          loading: 'lazy'
+        }
+      })
+    }
+  }).trim();
+
 export const sanitizeProductDetailHtml = (value: unknown, maxLength = 20000) =>
-  sanitizeHtml(String(value ?? '').slice(0, maxLength), {
+  sanitizeHtml(extractProductHtmlFragment(value, maxLength), {
     allowedTags: sharedAllowedTags,
     allowedAttributes: {
       '*': ['class', 'title'],

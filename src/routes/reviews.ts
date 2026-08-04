@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import Review from '../models/Review.js';
-import Product from '../models/Product.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
+import { recalculateProductReviewSummary } from '../lib/productReviews.js';
 
 const router = Router();
 
@@ -39,14 +39,7 @@ router.post('/', async (req: Request, res: Response) => {
 
     await newReview.save();
 
-    // Recalculate average product rating and reviewCount
-    const reviews = await Review.find({ productId, isApproved: true });
-    const avgRating = Number((reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1));
-
-    await Product.findByIdAndUpdate(productId, {
-      rating: avgRating,
-      reviewCount: reviews.length
-    });
+    await recalculateProductReviewSummary(productId);
 
     res.status(201).json(newReview);
   } catch (err: any) {
@@ -73,6 +66,7 @@ router.put('/:id/approve', authenticateToken, requireAdmin, async (req: Request,
       { new: true }
     );
     if (!review) return res.status(404).json({ error: 'Review not found' });
+    await recalculateProductReviewSummary(review.productId);
     res.json(review);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -84,6 +78,7 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req: Request, res:
   try {
     const review = await Review.findByIdAndDelete(req.params.id);
     if (!review) return res.status(404).json({ error: 'Review not found' });
+    await recalculateProductReviewSummary(review.productId);
     res.json({ message: 'Review deleted successfully' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

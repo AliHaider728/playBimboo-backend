@@ -10,6 +10,7 @@ import {
   sendOrderStatusEmail
 } from '../utils/mailer.js';
 import { authenticateToken, requireAdmin, AuthRequest } from '../middleware/auth.js';
+import { hasVariantGroups, normalizeInventory } from '../lib/inventory.js';
 
 const router = Router();
 
@@ -49,23 +50,26 @@ const parseVariantSelection = (selection?: string) =>
       })
   );
 
-const validateItemStock = (product: any, quantity: number, selectedVariant?: string) => {
+export const validateItemStock = (product: any, quantity: number, selectedVariant?: string) => {
   if (!Number.isInteger(quantity) || quantity <= 0) throw new Error('Order item quantity must be a positive integer');
-  if (!product.inStock || product.stockQuantity < quantity) {
-    throw new Error(`${product.name} does not have enough stock`);
-  }
-
   const groups = Array.isArray(product.variants)
     ? product.variants.filter((group: any) => Array.isArray(group.options) && group.options.length > 0)
     : [];
-  if (groups.length === 0) return;
+  if (groups.length === 0) {
+    const inventory = normalizeInventory(product);
+    if (!inventory.inStock || (inventory.trackInventory && (inventory.stockQuantity || 0) < quantity)) {
+      throw new Error(`${product.name} does not have enough stock`);
+    }
+    return;
+  }
 
   const selections = parseVariantSelection(selectedVariant);
   for (const group of groups) {
     const selectedName = selections.get(group.name);
     const option = group.options.find((candidate: any) => candidate.name === selectedName);
     if (!option) throw new Error(`Select a valid ${group.name} option for ${product.name}`);
-    if (option.inStock === false || (option.stockQuantity !== undefined && option.stockQuantity < quantity)) {
+    const inventory = normalizeInventory(option);
+    if (!inventory.inStock || (inventory.trackInventory && (inventory.stockQuantity || 0) < quantity)) {
       throw new Error(`${product.name} – ${option.name} does not have enough stock`);
     }
   }
@@ -75,15 +79,28 @@ const adjustProductStock = async (productId: string, quantityDelta: number, sele
   const product: any = await Product.findById(productId);
   if (!product) return;
 
-  product.stockQuantity = Math.max(0, product.stockQuantity + quantityDelta);
-  product.inStock = product.stockQuantity > 0;
-  const selections = parseVariantSelection(selectedVariant);
-  for (const group of product.variants || []) {
-    const selectedName = selections.get(group.name);
-    const option = group.options?.find((candidate: any) => candidate.name === selectedName);
-    if (option && option.stockQuantity !== undefined) {
-      option.stockQuantity = Math.max(0, option.stockQuantity + quantityDelta);
-      option.inStock = option.stockQuantity > 0;
+  if (hasVariantGroups(product)) {
+    const selections = parseVariantSelection(selectedVariant);
+    for (const group of product.variants || []) {
+      const selectedName = selections.get(group.name);
+      const option = group.options?.find((candidate: any) => candidate.name === selectedName);
+      if (option) {
+        const inventory = normalizeInventory(option);
+        if (inventory.trackInventory) {
+          option.trackInventory = true;
+          option.stockQuantity = Math.max(0, (inventory.stockQuantity || 0) + quantityDelta);
+          option.stockStatus = option.stockQuantity > 0 ? 'in_stock' : 'out_of_stock';
+          option.inStock = option.stockQuantity > 0;
+        }
+      }
+    }
+  } else {
+    const inventory = normalizeInventory(product);
+    if (inventory.trackInventory) {
+      product.trackInventory = true;
+      product.stockQuantity = Math.max(0, (inventory.stockQuantity || 0) + quantityDelta);
+      product.stockStatus = product.stockQuantity > 0 ? 'in_stock' : 'out_of_stock';
+      product.inStock = product.stockQuantity > 0;
     }
   }
   await product.save();
@@ -160,22 +177,28 @@ router.post('/', async (req: Request, res: Response) => {
       }
       validateItemStock(product, Number(item.quantity), item.selectedVariant);
       const productKey = String(product.id);
-      const requestedProductQuantity =
-        (requestedProductQuantities.get(productKey) || 0) + Number(item.quantity);
-      if (requestedProductQuantity > product.stockQuantity) {
-        return res.status(400).json({ error: `${product.name} does not have enough stock` });
+      if (!hasVariantGroups(product)) {
+        const productInventory = normalizeInventory(product);
+        if (productInventory.trackInventory) {
+          const requestedProductQuantity =
+            (requestedProductQuantities.get(productKey) || 0) + Number(item.quantity);
+          if (requestedProductQuantity > (productInventory.stockQuantity || 0)) {
+            return res.status(400).json({ error: `${product.name} does not have enough stock` });
+          }
+          requestedProductQuantities.set(productKey, requestedProductQuantity);
+        }
       }
-      requestedProductQuantities.set(productKey, requestedProductQuantity);
       verifiedProducts.set(String(product.id), product);
       const selections = parseVariantSelection(item.selectedVariant);
       for (const group of product.variants || []) {
         const selectedName = selections.get(group.name);
         const option = group.options?.find((candidate: any) => candidate.name === selectedName);
-        if (option?.stockQuantity !== undefined) {
+        const optionInventory = option ? normalizeInventory(option) : undefined;
+        if (option && optionInventory?.trackInventory) {
           const variantKey = `${productKey}:${group.name}:${option.name}`;
           const requestedVariantQuantity =
             (requestedVariantQuantities.get(variantKey) || 0) + Number(item.quantity);
-          if (requestedVariantQuantity > option.stockQuantity) {
+          if (requestedVariantQuantity > (optionInventory.stockQuantity || 0)) {
             return res.status(400).json({
               error: `${product.name} – ${option.name} does not have enough stock`
             });
@@ -339,6 +362,27 @@ router.put('/:orderId/status', authenticateToken, requireAdmin, async (req: Requ
 
     const statusChanged = previousOrder.status !== status;
     const transitionedToDelivered = statusChanged && status === 'Delivered';
+
+    if (statusChanged && status === 'Cancelled') {
+      for (const item of order.items) {
+        if (item.productId) await adjustProductStock(item.productId, item.quantity, item.selectedVariant);
+      }
+    } else if (statusChanged && previousOrder.status === 'Cancelled') {
+      try {
+        for (const item of order.items) {
+          if (!item.productId) continue;
+          const product = await Product.findById(item.productId);
+          if (product) validateItemStock(product, item.quantity, item.selectedVariant);
+        }
+      } catch (error) {
+        order.status = previousOrder.status;
+        await order.save();
+        throw error;
+      }
+      for (const item of order.items) {
+        if (item.productId) await adjustProductStock(item.productId, -item.quantity, item.selectedVariant);
+      }
+    }
 
     if (transitionedToDelivered) {
       order.deliveredAt = new Date();

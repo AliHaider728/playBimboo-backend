@@ -4,8 +4,10 @@ import {
   normalizeAgeGroups,
   normalizeProductDetailBlocks,
   sanitizeAndScopeProductCss,
+  sanitizeProductDescription,
   sanitizeProductDetailHtml
 } from '../src/lib/productContent.js';
+import { normalizeInventory } from '../src/lib/inventory.js';
 import {
   DEFAULT_HOMEPAGE_SECTIONS,
   DEFAULT_STOREFRONT_NAVIGATION,
@@ -13,6 +15,7 @@ import {
 } from '../src/config/storeAppearance.js';
 import { requireAdmin, requireSuperAdmin } from '../src/middleware/auth.js';
 import { requestChangesCustomCode } from '../src/routes/products.js';
+import { validateItemStock } from '../src/routes/orders.js';
 
 test('multi-age normalization supports legacy reads and canonical multi-select writes', () => {
   assert.deepEqual(normalizeAgeGroups(undefined, '3-5'), ['3-5']);
@@ -34,6 +37,46 @@ test('product HTML sanitizer removes executable and remote-image content', () =>
   assert.doesNotMatch(result, /script|onclick|onerror|form|input|evil\.example/i);
   assert.match(result, /Safe title/);
   assert.match(result, /Safe table/);
+});
+
+test('full and escaped page documents are reduced to safe body fragments', () => {
+  const fullDocument = '<!DOCTYPE html><html><head><style>body{display:none}</style><script>alert(1)</script></head><body><h2>Feature title</h2><p>Useful copy</p></body></html>';
+  const normalized = sanitizeProductDescription(fullDocument);
+  assert.equal(normalized, '<h2>Feature title</h2><p>Useful copy</p>');
+  assert.equal(
+    sanitizeProductDescription('&lt;!DOCTYPE html&gt;&lt;html&gt;&lt;body&gt;&lt;p&gt;Escaped copy&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;'),
+    '<p>Escaped copy</p>'
+  );
+});
+
+test('inventory normalization resolves legacy contradictions without forcing untracked stock to zero', () => {
+  assert.deepEqual(normalizeInventory({ stockQuantity: 9, inStock: false }), {
+    trackInventory: true,
+    stockQuantity: 9,
+    stockStatus: 'in_stock',
+    inStock: true,
+    lowStockThreshold: undefined
+  });
+  assert.deepEqual(normalizeInventory({ trackInventory: false, stockStatus: 'in_stock' }), {
+    trackInventory: false,
+    stockStatus: 'in_stock',
+    inStock: true
+  });
+});
+
+test('variant inventory controls checkout without a stale parent override', () => {
+  const product = {
+    name: 'Variant toy',
+    trackInventory: true,
+    stockQuantity: 0,
+    inStock: false,
+    variants: [{
+      name: 'Pieces',
+      options: [{ name: '64 PCS', trackInventory: true, stockQuantity: 3, inStock: true }]
+    }]
+  };
+  assert.doesNotThrow(() => validateItemStock(product, 2, 'Pieces: 64 PCS'));
+  assert.throws(() => validateItemStock(product, 4, 'Pieces: 64 PCS'), /enough stock/i);
 });
 
 test('product CSS is scoped and blocks global or external constructs', () => {

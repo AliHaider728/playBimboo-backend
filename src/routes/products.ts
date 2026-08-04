@@ -13,9 +13,12 @@ import {
 import {
   normalizeAgeGroups,
   normalizeProductDetailBlocks,
+  sanitizeProductDescription,
   sanitizeAndScopeProductCss,
   SUPPORTED_AGE_GROUPS
 } from '../lib/productContent.js';
+import { normalizeInventory } from '../lib/inventory.js';
+import { getApprovedReviewSummaries, ReviewSummary } from '../lib/productReviews.js';
 
 const router = Router();
 const upload = multer({
@@ -36,39 +39,9 @@ const parseCsvBuffer = (buffer: Buffer) =>
       .on('error', reject);
   });
 
-const ALLOWED_RICH_TEXT_TAGS = new Set([
-  'p',
-  'br',
-  'strong',
-  'b',
-  'em',
-  'i',
-  'ul',
-  'ol',
-  'li',
-  'a'
-]);
-
 const sanitizeRichText = (value: unknown): string => {
   if (typeof value !== 'string') return '';
-
-  return value
-    .replace(/<!--([\s\S]*?)-->/g, '')
-    .replace(/<(script|style|iframe|object|embed)[^>]*>[\s\S]*?<\/\1>/gi, '')
-    .replace(/<\/?([a-z0-9]+)([^>]*)>/gi, (tag, rawName: string, attributes: string) => {
-      const name = rawName.toLowerCase();
-      if (!ALLOWED_RICH_TEXT_TAGS.has(name)) return '';
-      if (tag.startsWith('</')) return `</${name}>`;
-      if (name === 'br') return '<br>';
-      if (name !== 'a') return `<${name}>`;
-
-      const hrefMatch = attributes.match(/\shref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i);
-      const href = (hrefMatch?.[1] || hrefMatch?.[2] || hrefMatch?.[3] || '').trim();
-      if (!/^(https?:\/\/|mailto:|#)/i.test(href)) return '<a>';
-      const safeHref = href.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-      return `<a href="${safeHref}" target="_blank" rel="noopener noreferrer">`;
-    })
-    .trim();
+  return sanitizeProductDescription(value);
 };
 
 const sanitizePlainText = (value: unknown, maxLength: number): string =>
@@ -102,14 +75,53 @@ const safelyNormalizeAgeGroups = (product: Record<string, any>) => {
   }
 };
 
-const serializeProduct = (value: any) => {
+const serializeProduct = (value: any, reviewSummary?: ReviewSummary) => {
   const product = typeof value?.toObject === 'function' ? value.toObject() : { ...value };
   product.ageGroups = safelyNormalizeAgeGroups(product);
   delete product.ageGroup;
-  product.productDetailBlocks = Array.isArray(product.productDetailBlocks)
-    ? product.productDetailBlocks
+  try {
+    product.productDetailBlocks = normalizeProductDetailBlocks(product.productDetailBlocks);
+  } catch {
+    product.productDetailBlocks = [];
+  }
+  // `description` is canonical. `detailedDescription` is a read-only fallback for legacy documents.
+  product.description = sanitizeProductDescription(product.description ?? product.detailedDescription);
+  delete product.detailedDescription;
+  const productInventory = normalizeInventory(product);
+  Object.assign(product, productInventory, {
+    stockQuantity: productInventory.trackInventory ? productInventory.stockQuantity : null,
+    lowStockThreshold: productInventory.trackInventory ? productInventory.lowStockThreshold : null
+  });
+  product.variants = Array.isArray(product.variants)
+    ? product.variants.map((group: any) => ({
+        ...group,
+        options: Array.isArray(group.options)
+          ? group.options.map((option: any) => {
+              const inventory = normalizeInventory(option);
+              return {
+                ...option,
+                ...inventory,
+                stockQuantity: inventory.trackInventory ? inventory.stockQuantity : null,
+                lowStockThreshold: inventory.trackInventory ? inventory.lowStockThreshold : null
+              };
+            })
+          : []
+      }))
     : [];
+  product.category = typeof product.category === 'string' ? product.category : '';
+  product.categorySlug = typeof product.categorySlug === 'string' ? product.categorySlug : '';
+  product.rating = reviewSummary?.rating ?? 0;
+  product.reviewCount = reviewSummary?.reviewCount ?? 0;
   return product;
+};
+
+const serializeProducts = async (values: any[]) => {
+  const plainValues = values.map(value => typeof value?.toObject === 'function' ? value.toObject() : { ...value });
+  const summaries = await getApprovedReviewSummaries(plainValues);
+  return values.map((value, index) => {
+    const key = String(plainValues[index]._id || plainValues[index].id || '');
+    return serializeProduct(value, summaries.get(key));
+  });
 };
 
 const getProductImagePublicIds = (product: Record<string, any>) => [
@@ -165,20 +177,31 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
   };
 
   const name = sanitizePlainText(merged.name, 160);
-  const description = sanitizeRichText(merged.description);
+  // New writes always persist the canonical `description`; legacy `detailedDescription` only fills a missing value.
+  const description = sanitizeProductDescription(merged.description ?? merged.detailedDescription);
   const descriptionText = description.replace(/<[^>]+>/g, '').trim();
   const category = sanitizePlainText(merged.category, 120);
-  const categorySlug = createSlug(merged.categorySlug || category);
+  const categorySlug = category ? createSlug(merged.categorySlug || category) : '';
   const slug = createSlug(merged.slug || name);
   const ageGroups = normalizeAgeGroups(merged.ageGroups, merged.ageGroup);
   const productDetailBlocks = normalizeProductDetailBlocks(merged.productDetailBlocks);
   const productDetailCss = sanitizeAndScopeProductCss(merged.productDetailCustomCss, slug);
   const price = toNumber(merged.price, 'Price') as number;
   const originalPrice = toNumber(merged.originalPrice, 'Regular price', { optional: true });
-  const stockQuantity = toNumber(merged.stockQuantity, 'Stock quantity', { integer: true }) as number;
-  const lowStockThreshold = toNumber(merged.lowStockThreshold, 'Low stock alert', {
-    integer: true,
-    optional: true
+  const requestedTracking = typeof merged.trackInventory === 'boolean'
+    ? merged.trackInventory
+    : merged.stockQuantity !== undefined && merged.stockQuantity !== null && merged.stockQuantity !== '';
+  const stockQuantity = requestedTracking
+    ? toNumber(merged.stockQuantity, 'Stock quantity', { integer: true }) as number
+    : undefined;
+  const lowStockThreshold = requestedTracking
+    ? toNumber(merged.lowStockThreshold, 'Low stock alert', { integer: true, optional: true })
+    : undefined;
+  const inventory = normalizeInventory({
+    ...merged,
+    trackInventory: requestedTracking,
+    stockQuantity,
+    lowStockThreshold
   });
   const weight = toNumber(merged.weight, 'Weight', { optional: true });
   const customDeliveryFee = toNumber(merged.customDeliveryFee, 'Custom shipping fee', {
@@ -187,7 +210,6 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
 
   if (!name) throw new Error('Product name is required');
   if (!descriptionText) throw new Error('Detailed description is required');
-  if (!category || !categorySlug) throw new Error('Category is required');
   if (!slug || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
     throw new Error('URL slug must contain lowercase letters, numbers, and hyphens only');
   }
@@ -255,9 +277,16 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
           options: Array.isArray(group.options)
             ? group.options
                 .map((option: any, optionIndex: number) => {
-                  const optionStock = toNumber(option.stockQuantity, 'Variant stock', {
-                    integer: true,
-                    optional: true
+                  const optionTracksInventory = typeof option.trackInventory === 'boolean'
+                    ? option.trackInventory
+                    : option.stockQuantity !== undefined && option.stockQuantity !== null && option.stockQuantity !== '';
+                  const optionStock = optionTracksInventory
+                    ? toNumber(option.stockQuantity, 'Variant stock', { integer: true }) as number
+                    : undefined;
+                  const optionInventory = normalizeInventory({
+                    ...option,
+                    trackInventory: optionTracksInventory,
+                    stockQuantity: optionStock
                   });
                   return {
                     id: sanitizePlainText(option.id, 80) || `option-${groupIndex + 1}-${optionIndex + 1}`,
@@ -265,8 +294,9 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
                     priceOffset: toNumber(option.priceOffset, 'Variant price adjustment', {
                       optional: true
                     }) || 0,
-                    stockQuantity: optionStock,
-                    inStock: optionStock === undefined ? option.inStock !== false : optionStock > 0,
+                    ...optionInventory,
+                    stockQuantity: optionInventory.trackInventory ? optionInventory.stockQuantity : null,
+                    lowStockThreshold: optionInventory.trackInventory ? optionInventory.lowStockThreshold : null,
                     sku: sanitizePlainText(option.sku, 80).toUpperCase() || undefined
                   };
                 })
@@ -294,15 +324,15 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
     originalPrice,
     discountPercent:
       originalPrice !== undefined ? Math.round(((originalPrice - price) / originalPrice) * 100) : 0,
-    rating: Number.isFinite(Number(merged.rating)) ? Number(merged.rating) : 5,
-    reviewCount: Number.isFinite(Number(merged.reviewCount)) ? Number(merged.reviewCount) : 0,
+    rating: Number.isFinite(Number(current?.rating)) ? Number(current?.rating) : 0,
+    reviewCount: Number.isFinite(Number(current?.reviewCount)) ? Number(current?.reviewCount) : 0,
     category,
     categorySlug,
     ageGroups,
     brand: sanitizePlainText(merged.brand, 100) || 'PlayBimboo',
-    inStock: Boolean(merged.inStock) && stockQuantity > 0,
-    stockQuantity,
-    lowStockThreshold,
+    ...inventory,
+    stockQuantity: inventory.trackInventory ? inventory.stockQuantity : null,
+    lowStockThreshold: inventory.trackInventory ? inventory.lowStockThreshold : null,
     images,
     imagePublicIds,
     shortDescription: sanitizePlainText(merged.shortDescription, 300),
@@ -364,6 +394,7 @@ const assertUniqueIdentifiers = async (
 // GET all products (Supports category, ageGroup, search, isVisible filter)
 router.get('/', async (req: Request, res: Response) => {
   try {
+    res.set('Cache-Control', 'no-store, max-age=0');
     const { category, ageGroup, search, isVisible, limit } = req.query;
     const filter: any = {};
 
@@ -410,7 +441,7 @@ router.get('/', async (req: Request, res: Response) => {
     }
 
     const products = await query.exec();
-    res.json(products.map(serializeProduct));
+    res.json(await serializeProducts(products));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -457,12 +488,13 @@ router.post('/import/csv', authenticateToken, requireAdmin, upload.single('file'
         slug,
         price: Number(item.price),
         originalPrice: item.originalPrice ? Number(item.originalPrice) : undefined,
-        category: item.category || 'Toys',
-        categorySlug: item.categorySlug || 'toys',
+        category: item.category || '',
+        categorySlug: item.categorySlug || '',
         ageGroups,
         brand: item.brand || 'PlayBimboo',
-        stockQuantity: Number(item.stockQuantity) || 10,
-        inStock: Number(item.stockQuantity) !== 0,
+        trackInventory: item.trackInventory === 'true' || Boolean(item.stockQuantity?.trim()),
+        stockQuantity: item.stockQuantity?.trim() ? Number(item.stockQuantity) : undefined,
+        stockStatus: item.stockStatus || (item.inStock === 'false' ? 'out_of_stock' : 'in_stock'),
         description: item.description || 'Quality toy for kids.',
         isVisible: item.isVisible !== 'false',
         images: item.images
@@ -490,6 +522,7 @@ router.post('/import/csv', authenticateToken, requireAdmin, upload.single('file'
 // GET single product by slug or ID
 router.get('/:idOrSlug', async (req: Request, res: Response) => {
   try {
+    res.set('Cache-Control', 'no-store, max-age=0');
     const { idOrSlug } = req.params;
     let product = await Product.findOne({ slug: idOrSlug });
     if (!product && idOrSlug.match(/^[0-9a-fA-F]{24}$/)) {
@@ -499,7 +532,7 @@ router.get('/:idOrSlug', async (req: Request, res: Response) => {
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
     }
-    res.json(serializeProduct(product));
+    res.json((await serializeProducts([product]))[0]);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -515,7 +548,7 @@ router.post('/', authenticateToken, requireAdmin, async (req: AuthRequest, res: 
     await assertUniqueIdentifiers(payload);
     const newProduct = new Product(payload);
     await newProduct.save();
-    res.status(201).json(serializeProduct(newProduct));
+    res.status(201).json((await serializeProducts([newProduct]))[0]);
   } catch (err: any) {
     const isConflict = err?.code === 11000 || /already used|unique/i.test(err.message);
     res.status(isConflict ? 409 : 400).json({ error: err.message });
@@ -550,7 +583,7 @@ router.put('/:id', authenticateToken, requireAdmin, async (req: AuthRequest, res
     if (removedPublicIds.length > 0) {
       await deleteImagesUnusedByOtherProducts(removedPublicIds, product.id);
     }
-    res.json(serializeProduct(product));
+    res.json((await serializeProducts([product]))[0]);
   } catch (err: any) {
     const isConflict = err?.code === 11000 || /already used|unique/i.test(err.message);
     res.status(isConflict ? 409 : 400).json({ error: err.message });

@@ -6,7 +6,10 @@ export interface IProductVariantOption {
   name: string;
   priceOffset?: number;
   inStock?: boolean;
-  stockQuantity?: number;
+  trackInventory?: boolean;
+  stockQuantity?: number | null;
+  stockStatus?: 'in_stock' | 'out_of_stock';
+  lowStockThreshold?: number | null;
   sku?: string;
 }
 
@@ -25,13 +28,15 @@ export interface IProduct extends Document {
   discountPercent?: number;
   rating: number;
   reviewCount: number;
-  category: string;
-  categorySlug: string;
+  category?: string;
+  categorySlug?: string;
   ageGroup?: string;
   ageGroups: SupportedAgeGroup[];
   brand: string;
   inStock: boolean;
-  stockQuantity: number;
+  trackInventory?: boolean;
+  stockQuantity?: number | null;
+  stockStatus?: 'in_stock' | 'out_of_stock';
   images: string[];
   imagePublicIds: string[];
   shortDescription?: string;
@@ -39,7 +44,7 @@ export interface IProduct extends Document {
   isVisible: boolean;
   status: 'draft' | 'published';
   isFeatured: boolean;
-  lowStockThreshold?: number;
+  lowStockThreshold?: number | null;
   weight?: number;
   deliveryType?: 'store_threshold' | 'category' | 'fixed' | 'free' | 'none';
   customDeliveryFee?: number;
@@ -64,10 +69,10 @@ const ProductSchema = new Schema<IProduct>(
     price: { type: Number, required: true, min: 0 },
     originalPrice: { type: Number, min: 0 },
     discountPercent: { type: Number, default: 0 },
-    rating: { type: Number, default: 5.0 },
+    rating: { type: Number, default: 0 },
     reviewCount: { type: Number, default: 0 },
-    category: { type: String, required: true },
-    categorySlug: { type: String, required: true },
+    category: { type: String, default: '' },
+    categorySlug: { type: String, default: '' },
     // ageGroup remains readable for old production documents while ageGroups is
     // the canonical field for all new writes.
     ageGroup: { type: String },
@@ -81,7 +86,9 @@ const ProductSchema = new Schema<IProduct>(
     },
     brand: { type: String, default: 'PlayBimboo' },
     inStock: { type: Boolean, default: true },
-    stockQuantity: { type: Number, default: 10, min: 0 },
+    trackInventory: { type: Boolean, default: undefined },
+    stockQuantity: { type: Number, min: 0, default: undefined },
+    stockStatus: { type: String, enum: ['in_stock', 'out_of_stock'], default: undefined },
     lowStockThreshold: { type: Number, min: 0 },
     images: {
       type: [{ type: String }],
@@ -116,7 +123,10 @@ const ProductSchema = new Schema<IProduct>(
             name: String,
             priceOffset: Number,
             inStock: Boolean,
+            trackInventory: { type: Boolean, default: undefined },
             stockQuantity: { type: Number, min: 0 },
+            stockStatus: { type: String, enum: ['in_stock', 'out_of_stock'], default: undefined },
+            lowStockThreshold: { type: Number, min: 0 },
             sku: { type: String, trim: true, uppercase: true }
           }
         ]
