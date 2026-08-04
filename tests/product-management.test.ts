@@ -13,7 +13,7 @@ import {
   DEFAULT_STOREFRONT_NAVIGATION,
   validateAppearanceInput
 } from '../src/config/storeAppearance.js';
-import { requireAdmin, requireSuperAdmin } from '../src/middleware/auth.js';
+import { authenticateIfPresent, requireAdmin, requireSuperAdmin } from '../src/middleware/auth.js';
 import { requestChangesCustomCode } from '../src/routes/products.js';
 import { validateItemStock } from '../src/routes/orders.js';
 
@@ -160,6 +160,14 @@ test('admin and super-admin authorization remain separated', () => {
   assert.equal(authorizationResult(requireAdmin, 'super_admin').nextCalled, true);
   assert.equal(authorizationResult(requireSuperAdmin, 'admin').status, 403);
   assert.equal(authorizationResult(requireSuperAdmin, 'super_admin').nextCalled, true);
+});
+
+test('optional authentication leaves public reads anonymous when no token is sent', () => {
+  let nextCalled = false;
+  const request = { headers: {} } as any;
+  authenticateIfPresent(request, {} as any, () => { nextCalled = true; });
+  assert.equal(nextCalled, true);
+  assert.equal(request.user, undefined);
 });
 
 test('normal product edits preserve existing custom code but cannot alter it', () => {

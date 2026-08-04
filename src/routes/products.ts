@@ -5,7 +5,7 @@ import multer from 'multer';
 import csvParser from 'csv-parser';
 import { Parser } from 'json2csv';
 import { Readable } from 'node:stream';
-import { AuthRequest, authenticateToken, requireAdmin } from '../middleware/auth.js';
+import { AuthRequest, authenticateIfPresent, authenticateToken, requireAdmin } from '../middleware/auth.js';
 import {
   deleteProductImages,
   hasCloudinaryConfiguration,
@@ -403,11 +403,16 @@ const assertUniqueIdentifiers = async (
 };
 
 // GET all products (Supports category, ageGroup, search, isVisible filter)
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', authenticateIfPresent, async (req: AuthRequest, res: Response) => {
   try {
     res.set('Cache-Control', 'no-store, max-age=0');
     const { category, ageGroup, search, isVisible, limit } = req.query;
     const filter: any = {};
+    const adminRead = ['admin', 'super_admin'].includes(req.user?.role || '');
+    if (!adminRead) {
+      filter.isVisible = { $ne: false };
+      filter.status = { $ne: 'draft' };
+    }
 
     if (category && category !== 'all') {
       filter.categorySlug = category;
@@ -432,7 +437,7 @@ router.get('/', async (req: Request, res: Response) => {
         ] }
       ];
     }
-    if (isVisible !== undefined) {
+    if (isVisible !== undefined && adminRead) {
       filter.isVisible = isVisible === 'true';
     }
     if (search) {
@@ -531,13 +536,15 @@ router.post('/import/csv', authenticateToken, requireAdmin, upload.single('file'
 });
 
 // GET single product by slug or ID
-router.get('/:idOrSlug', async (req: Request, res: Response) => {
+router.get('/:idOrSlug', authenticateIfPresent, async (req: AuthRequest, res: Response) => {
   try {
     res.set('Cache-Control', 'no-store, max-age=0');
     const { idOrSlug } = req.params;
-    let product = await Product.findOne({ slug: idOrSlug });
+    const adminRead = ['admin', 'super_admin'].includes(req.user?.role || '');
+    const visibilityFilter = adminRead ? {} : { isVisible: { $ne: false }, status: { $ne: 'draft' } };
+    let product = await Product.findOne({ slug: idOrSlug, ...visibilityFilter });
     if (!product && idOrSlug.match(/^[0-9a-fA-F]{24}$/)) {
-      product = await Product.findById(idOrSlug);
+      product = await Product.findOne({ _id: idOrSlug, ...visibilityFilter });
     }
 
     if (!product) {

@@ -21,12 +21,14 @@ const parseCookies = (req: Request): Record<string, string> => {
   return list;
 };
 
+const getRequestToken = (req: Request) => {
+  const authHeader = req.headers.authorization;
+  const headerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+  return parseCookies(req).pb_admin_token || headerToken;
+};
+
 export const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction) => {
-  const authHeader = req.headers['authorization'];
-  const headerToken = authHeader && authHeader.split(' ')[1];
-  const cookies = parseCookies(req);
-  const cookieToken = cookies['pb_admin_token'];
-  const token = cookieToken || headerToken;
+  const token = getRequestToken(req);
 
   if (!token) {
     return res.status(401).json({ error: 'Authentication required. No token provided.' });
@@ -45,6 +47,19 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
     req.user = decoded as { userId: string; email: string; role: string };
     next();
   });
+};
+
+export const authenticateIfPresent = (req: AuthRequest, res: Response, next: NextFunction) => {
+  const token = getRequestToken(req);
+  if (!token) return next();
+  const secret = process.env.JWT_SECRET;
+  if (!secret) return next();
+  try {
+    req.user = jwt.verify(token, secret) as { userId: string; email: string; role: string };
+    next();
+  } catch {
+    return next();
+  }
 };
 
 export const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
