@@ -11,6 +11,7 @@ import reviewRoutes from './routes/reviews.js';
 import authRoutes from './routes/auth.js';
 import uploadRoutes from './routes/upload.js';
 import seedRoutes from './routes/seed.js';
+import superAdminMigrationOnceRoutes from './routes/superAdminMigrationOnce.js';
 
 const app = express();
 
@@ -76,5 +77,6 @@ app.use('/api/reviews', requireDatabaseConnection, reviewRoutes);
 app.use('/api/auth', requireDatabaseConnection, authRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/seed', requireDatabaseConnection, seedRoutes);
+app.use('/api/internal/super-admin-migration-once', requireDatabaseConnection, superAdminMigrationOnceRoutes);
 
 export default app;
