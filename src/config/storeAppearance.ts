@@ -1,34 +1,46 @@
-export const NAVIGATION_KEYS = [
-  'home',
-  'shop',
-  'categories',
-  'about',
-  'contact',
-  'wishlist',
-  'account'
+import { randomUUID } from 'node:crypto';
+
+export const SYSTEM_NAVIGATION_KEYS = [
+  'home', 'shop', 'categories', 'about', 'contact', 'wishlist', 'account'
 ] as const;
 
 export const HOMEPAGE_SECTION_KEYS = [
-  'hero',
-  'categories',
-  'ageGroups',
-  'featuredProducts',
-  'brandCampaign',
-  'newArrivals'
+  'hero', 'categories', 'ageGroups', 'featuredProducts', 'brandCampaign', 'newArrivals'
 ] as const;
 
-export type NavigationKey = typeof NAVIGATION_KEYS[number];
+export const INTERNAL_PAGE_ROUTES: Record<string, string> = {
+  home: '/',
+  shop: '/category/all',
+  categories: '/category/all',
+  about: '/about',
+  contact: '/contact',
+  wishlist: '/wishlist',
+  account: '/account'
+};
+
+export type NavigationLinkType = 'internal_page' | 'category' | 'custom_internal_url' | 'external_url';
+export type NavigationMenuType = 'link' | 'dropdown';
 export type HomepageSectionKey = typeof HOMEPAGE_SECTION_KEYS[number];
 
 export interface StorefrontNavigationItem {
-  key: NavigationKey;
+  id: string;
+  key: string;
   label: string;
-  path: string;
+  linkType: NavigationLinkType;
+  menuType: NavigationMenuType;
+  path?: string;
+  externalUrl?: string;
+  categoryId?: string;
+  parentId?: string | null;
   visible: boolean;
   enabled: boolean;
   showOnDesktop: boolean;
   showOnMobile: boolean;
-  order: number;
+  displayOrder: number;
+  order?: number;
+  badgeText?: string;
+  openInNewTab?: boolean;
+  isSystemItem: boolean;
 }
 
 export interface HomepageSectionSetting {
@@ -42,186 +54,207 @@ export interface HomepageSectionSetting {
   ctaLink?: string;
 }
 
+const systemItem = (
+  key: typeof SYSTEM_NAVIGATION_KEYS[number],
+  label: string,
+  displayOrder: number,
+  overrides: Partial<StorefrontNavigationItem> = {}
+): StorefrontNavigationItem => ({
+  id: `nav-${key}`,
+  key,
+  label,
+  linkType: 'internal_page',
+  menuType: 'link',
+  path: INTERNAL_PAGE_ROUTES[key],
+  parentId: null,
+  visible: true,
+  enabled: true,
+  showOnDesktop: true,
+  showOnMobile: true,
+  displayOrder,
+  order: displayOrder,
+  isSystemItem: true,
+  ...overrides
+});
+
 export const DEFAULT_STOREFRONT_NAVIGATION: StorefrontNavigationItem[] = [
-  { key: 'home', label: 'Home', path: '/', visible: true, enabled: true, showOnDesktop: true, showOnMobile: true, order: 0 },
-  { key: 'shop', label: 'Shop', path: '/category/all', visible: true, enabled: true, showOnDesktop: true, showOnMobile: false, order: 1 },
-  { key: 'categories', label: 'Shop Categories', path: '/category/all', visible: true, enabled: true, showOnDesktop: true, showOnMobile: true, order: 2 },
-  { key: 'about', label: 'About', path: '/about', visible: true, enabled: true, showOnDesktop: true, showOnMobile: false, order: 3 },
-  { key: 'contact', label: 'Contact', path: '/contact', visible: true, enabled: true, showOnDesktop: true, showOnMobile: false, order: 4 },
-  { key: 'wishlist', label: 'Wishlist', path: '/wishlist', visible: true, enabled: true, showOnDesktop: false, showOnMobile: true, order: 5 },
-  { key: 'account', label: 'Account', path: '/account', visible: true, enabled: true, showOnDesktop: false, showOnMobile: true, order: 6 }
+  systemItem('home', 'Home', 0),
+  systemItem('shop', 'Shop', 1, { showOnMobile: false }),
+  systemItem('categories', 'Shop Categories', 2, { menuType: 'dropdown' }),
+  systemItem('about', 'About', 3, { showOnMobile: false }),
+  systemItem('contact', 'Contact', 4, { showOnMobile: false }),
+  systemItem('wishlist', 'Wishlist', 5, { showOnDesktop: false }),
+  systemItem('account', 'Account', 6, { showOnDesktop: false })
 ];
 
 export const DEFAULT_HOMEPAGE_SECTIONS: HomepageSectionSetting[] = [
-  {
-    key: 'hero',
-    name: 'Hero',
-    enabled: true,
-    order: 0,
-    heading: 'Where Imagination Comes to Play!',
-    subheading: 'Discover award-winning toys, STEM sets, plushies, action figures, and more that spark curiosity, inspire learning, and bring families closer together through the power of play.',
-    ctaLabel: 'Explore All Toys',
-    ctaLink: '/category/all'
-  },
-  {
-    key: 'categories',
-    name: 'Shop by Category',
-    enabled: true,
-    order: 1,
-    heading: 'Shop by Category',
-    subheading: 'Browse Collections',
-    ctaLabel: 'View All Categories',
-    ctaLink: '/category/all'
-  },
-  {
-    key: 'ageGroups',
-    name: 'Shop by Age Group',
-    enabled: true,
-    order: 2,
-    heading: 'Shop by Age Group',
-    subheading: 'Find perfectly developmental and age-appropriate toys designed for your child’s growth.'
-  },
-  {
-    key: 'featuredProducts',
-    name: 'Featured Products',
-    enabled: true,
-    order: 3,
-    heading: 'Featured Toys & Bestsellers',
-    subheading: 'Hot Picks',
-    ctaLabel: 'Shop All Bestsellers',
-    ctaLink: '/category/all'
-  },
-  {
-    key: 'brandCampaign',
-    name: 'Play, Learn, Grow',
-    enabled: true,
-    order: 4,
-    heading: 'Discover Toys That Make Learning Magical',
-    subheading: 'From STEM kits and building sets to creative play essentials, PlayBimboo brings fun, skill-building toys that spark curiosity and joyful learning at every age.',
-    ctaLabel: 'Explore PlayBimboo Favorites',
-    ctaLink: '/category/all'
-  },
-  {
-    key: 'newArrivals',
-    name: 'New Arrivals',
-    enabled: true,
-    order: 5,
-    heading: 'New Arrivals & Restocks',
-    subheading: 'Fresh In Store',
-    ctaLabel: 'Browse New Additions',
-    ctaLink: '/category/all'
-  }
+  { key: 'hero', name: 'Hero', enabled: true, order: 0, heading: 'Where Imagination Comes to Play!', subheading: 'Discover award-winning toys, STEM sets, plushies, action figures, and more that spark curiosity, inspire learning, and bring families closer together through the power of play.', ctaLabel: 'Explore All Toys', ctaLink: '/category/all' },
+  { key: 'categories', name: 'Shop by Category', enabled: true, order: 1, heading: 'Shop by Category', subheading: 'Browse Collections', ctaLabel: 'View All Categories', ctaLink: '/category/all' },
+  { key: 'ageGroups', name: 'Shop by Age Group', enabled: true, order: 2, heading: 'Shop by Age Group', subheading: 'Find perfectly developmental and age-appropriate toys designed for your child’s growth.' },
+  { key: 'featuredProducts', name: 'Featured Products', enabled: true, order: 3, heading: 'Featured Toys & Bestsellers', subheading: 'Hot Picks', ctaLabel: 'Shop All Bestsellers', ctaLink: '/category/all' },
+  { key: 'brandCampaign', name: 'Play, Learn, Grow', enabled: true, order: 4, heading: 'Discover Toys That Make Learning Magical', subheading: 'From STEM kits and building sets to creative play essentials, PlayBimboo brings fun, skill-building toys that spark curiosity and joyful learning at every age.', ctaLabel: 'Explore PlayBimboo Favorites', ctaLink: '/category/all' },
+  { key: 'newArrivals', name: 'New Arrivals', enabled: true, order: 5, heading: 'New Arrivals & Restocks', subheading: 'Fresh In Store', ctaLabel: 'Browse New Additions', ctaLink: '/category/all' }
 ];
 
 const cleanText = (value: unknown, maxLength: number) =>
-  String(value ?? '')
-    .replace(/<[^>]*>/g, '')
-    .replace(/[\u0000-\u001f\u007f]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, maxLength);
+  String(value ?? '').replace(/<[^>]*>/g, '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, maxLength);
 
-const safeInternalLink = (value: unknown, fallback: string) => {
-  const link = String(value ?? '').trim();
-  if (!link) return fallback;
+export const safeInternalLink = (value: unknown, fallback = '') => {
+  const raw = String(value ?? '').trim();
+  if (!raw) return fallback;
+  const normalized = `/${raw.replace(/^\/+/, '').replace(/\/{2,}/g, '/')}`;
   if (
-    link.length > 200 ||
-    !/^\/(?!\/)[a-zA-Z0-9/_?=&%+.,#-]*$/.test(link) ||
-    /javascript:|data:|vbscript:/i.test(link)
-  ) {
-    throw new Error('Links must be safe internal storefront paths');
-  }
-  return link;
+    normalized.length > 200 ||
+    !/^\/(?!\/)[a-zA-Z0-9/_?=&%+.,#-]*$/.test(normalized) ||
+    /^\/admin(?:\/|$)/i.test(normalized) ||
+    /javascript:|data:|vbscript:|file:|%2f|%5c|(?:^|\/)\.\.(?:\/|$)/i.test(normalized)
+  ) throw new Error('Custom internal links must be safe public paths beginning with /');
+  return normalized;
 };
 
-const assertUniqueKeysAndOrder = (items: Array<{ key: string; order: number }>, knownKeys: readonly string[], label: string) => {
-  const keys = items.map(item => item.key);
-  if (items.length !== knownKeys.length || new Set(keys).size !== keys.length) {
-    throw new Error(`${label} must include every stable key exactly once`);
+const safeExternalLink = (value: unknown) => {
+  const raw = String(value ?? '').trim();
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== 'https:' || !parsed.hostname) throw new Error();
+    return parsed.toString();
+  } catch {
+    throw new Error('External links must be valid HTTPS URLs');
   }
-  if (keys.some(key => !knownKeys.includes(key))) throw new Error(`${label} contains an unknown key`);
-  const orders = items.map(item => item.order);
-  if (orders.some(order => !Number.isInteger(order) || order < 0) || new Set(orders).size !== orders.length) {
-    throw new Error(`${label} order values must be unique non-negative integers`);
+};
+
+const normalizeOrder = (items: StorefrontNavigationItem[]) => {
+  const groups = new Map<string, StorefrontNavigationItem[]>();
+  items.forEach(item => {
+    const key = item.parentId || '__root__';
+    groups.set(key, [...(groups.get(key) || []), item]);
+  });
+  groups.forEach(group => group
+    .sort((a, b) => a.displayOrder - b.displayOrder)
+    .forEach((item, index) => { item.displayOrder = index; item.order = index; }));
+  return items.sort((a, b) => {
+    if ((a.parentId || '') === (b.parentId || '')) return a.displayOrder - b.displayOrder;
+    return (a.parentId || '').localeCompare(b.parentId || '');
+  });
+};
+
+const normalizeNavigationItem = (raw: any, defaults?: StorefrontNavigationItem): StorefrontNavigationItem => {
+  const isSystemItem = Boolean(defaults);
+  const id = cleanText(raw?.id, 80) || defaults?.id || `nav-${randomUUID()}`;
+  const key = defaults?.key || cleanText(raw?.key, 80) || `custom-${id.replace(/^nav-/, '')}`;
+  const linkType = ['internal_page', 'category', 'custom_internal_url', 'external_url'].includes(raw?.linkType)
+    ? raw.linkType as NavigationLinkType
+    : defaults?.linkType || 'custom_internal_url';
+  const menuType = raw?.menuType === 'dropdown' ? 'dropdown' : defaults?.menuType || 'link';
+  const item: StorefrontNavigationItem = {
+    id,
+    key,
+    label: cleanText(raw?.label, 50) || defaults?.label || 'Navigation Item',
+    linkType,
+    menuType,
+    parentId: cleanText(raw?.parentId, 80) || null,
+    visible: typeof raw?.visible === 'boolean' ? raw.visible : defaults?.visible ?? true,
+    enabled: typeof raw?.enabled === 'boolean' ? raw.enabled : defaults?.enabled ?? true,
+    showOnDesktop: typeof raw?.showOnDesktop === 'boolean' ? raw.showOnDesktop : defaults?.showOnDesktop ?? true,
+    showOnMobile: typeof raw?.showOnMobile === 'boolean' ? raw.showOnMobile : defaults?.showOnMobile ?? true,
+    displayOrder: Number.isInteger(raw?.displayOrder ?? raw?.order) ? Number(raw.displayOrder ?? raw.order) : defaults?.displayOrder ?? 0,
+    badgeText: cleanText(raw?.badgeText, 20) || undefined,
+    openInNewTab: raw?.openInNewTab === true,
+    isSystemItem
+  };
+  item.order = item.displayOrder;
+  if (linkType === 'internal_page') {
+    const submittedPath = safeInternalLink(raw?.path);
+    const knownPath = isSystemItem
+      ? INTERNAL_PAGE_ROUTES[key]
+      : Object.values(INTERNAL_PAGE_ROUTES).find(path => path === submittedPath);
+    if (!knownPath) throw new Error(`Choose a valid public page for ${item.label}`);
+    item.path = knownPath;
+  } else if (linkType === 'category') {
+    item.categoryId = cleanText(raw?.categoryId, 80);
+    if (!item.categoryId) throw new Error(`Choose a category for ${item.label}`);
+  } else if (linkType === 'custom_internal_url') {
+    item.path = safeInternalLink(raw?.path);
+  } else {
+    item.externalUrl = safeExternalLink(raw?.externalUrl ?? raw?.path);
   }
+  if (menuType === 'dropdown') {
+    item.path = undefined;
+    item.externalUrl = undefined;
+    item.categoryId = undefined;
+    item.openInNewTab = false;
+  }
+  return item;
 };
 
 export const normalizeStoredNavigation = (value: unknown): StorefrontNavigationItem[] => {
   const stored = Array.isArray(value) ? value : [];
-  return DEFAULT_STOREFRONT_NAVIGATION.map(defaultItem => {
-    const candidate = stored.find(item => item && item.key === defaultItem.key) as Partial<StorefrontNavigationItem> | undefined;
-    return {
-      ...defaultItem,
-      label: cleanText(candidate?.label, 40) || defaultItem.label,
-      visible: typeof candidate?.visible === 'boolean' ? candidate.visible : defaultItem.visible,
-      enabled: typeof candidate?.enabled === 'boolean' ? candidate.enabled : defaultItem.enabled,
-      showOnDesktop: typeof candidate?.showOnDesktop === 'boolean' ? candidate.showOnDesktop : defaultItem.showOnDesktop,
-      showOnMobile: typeof candidate?.showOnMobile === 'boolean' ? candidate.showOnMobile : defaultItem.showOnMobile,
-      order: Number.isInteger(candidate?.order) ? Number(candidate?.order) : defaultItem.order
-    };
-  }).sort((a, b) => a.order - b.order);
+  const system = DEFAULT_STOREFRONT_NAVIGATION.map(defaultItem => {
+    const candidate = stored.find((item: any) => item?.key === defaultItem.key) || defaultItem;
+    try { return normalizeNavigationItem(candidate, defaultItem); } catch { return { ...defaultItem }; }
+  });
+  const custom = stored
+    .filter((item: any) => item && !SYSTEM_NAVIGATION_KEYS.includes(item.key))
+    .flatMap((item: any) => {
+      try { return [normalizeNavigationItem(item)]; } catch { return []; }
+    });
+  return normalizeOrder([...system, ...custom]);
 };
 
 export const normalizeStoredHomepageSections = (value: unknown): HomepageSectionSetting[] => {
   const stored = Array.isArray(value) ? value : [];
   return DEFAULT_HOMEPAGE_SECTIONS.map(defaultSection => {
-    const candidate = stored.find(item => item && item.key === defaultSection.key) as Partial<HomepageSectionSetting> | undefined;
+    const candidate = stored.find((item: any) => item?.key === defaultSection.key) || {};
     return {
       ...defaultSection,
-      enabled: typeof candidate?.enabled === 'boolean' ? candidate.enabled : defaultSection.enabled,
-      order: Number.isInteger(candidate?.order) ? Number(candidate?.order) : defaultSection.order,
-      heading: cleanText(candidate?.heading, 120) || defaultSection.heading,
-      subheading: cleanText(candidate?.subheading, 320) || defaultSection.subheading,
-      ctaLabel: defaultSection.ctaLabel
-        ? cleanText(candidate?.ctaLabel, 60) || defaultSection.ctaLabel
-        : undefined,
-      ctaLink: defaultSection.ctaLink
-        ? safeInternalLink(candidate?.ctaLink, defaultSection.ctaLink)
-        : undefined
+      enabled: typeof candidate.enabled === 'boolean' ? candidate.enabled : defaultSection.enabled,
+      order: Number.isInteger(candidate.order) ? candidate.order : defaultSection.order,
+      heading: cleanText(candidate.heading, 120) || defaultSection.heading,
+      subheading: cleanText(candidate.subheading, 320) || defaultSection.subheading,
+      ctaLabel: defaultSection.ctaLabel ? cleanText(candidate.ctaLabel, 60) || defaultSection.ctaLabel : undefined,
+      ctaLink: defaultSection.ctaLink ? safeInternalLink(candidate.ctaLink, defaultSection.ctaLink) : undefined
     };
-  }).sort((a, b) => a.order - b.order);
+  }).sort((a, b) => a.order - b.order).map((item, order) => ({ ...item, order }));
+};
+
+const validateNavigationGraph = (items: StorefrontNavigationItem[]) => {
+  if (items.length > 60) throw new Error('Navigation can contain at most 60 items');
+  const ids = items.map(item => item.id);
+  const keys = items.map(item => item.key);
+  if (new Set(ids).size !== ids.length) throw new Error('Navigation item IDs must be unique');
+  if (new Set(keys).size !== keys.length) throw new Error('Navigation item keys must be unique');
+  for (const systemKey of SYSTEM_NAVIGATION_KEYS) {
+    if (!items.some(item => item.key === systemKey && item.isSystemItem)) {
+      throw new Error(`Navigation must include every stable key; required system item ${systemKey} is missing`);
+    }
+  }
+  const byId = new Map(items.map(item => [item.id, item]));
+  items.forEach(item => {
+    if (!item.parentId) return;
+    if (item.parentId === item.id) throw new Error('Navigation items cannot be their own parent');
+    const parent = byId.get(item.parentId);
+    if (!parent) throw new Error(`Navigation parent for ${item.label} does not exist`);
+    if (parent.parentId) throw new Error('Navigation supports only one child level');
+    if (parent.menuType !== 'dropdown') throw new Error(`Parent ${parent.label} must be a dropdown`);
+    if (item.menuType === 'dropdown') throw new Error('Dropdown children cannot contain another dropdown');
+  });
 };
 
 export const validateAppearanceInput = (body: Record<string, unknown>) => {
   if (!Array.isArray(body.storefrontNavigation) || !Array.isArray(body.homepageSections)) {
     throw new Error('Navigation and homepage section settings are required');
   }
-  assertUniqueKeysAndOrder(body.storefrontNavigation as any[], NAVIGATION_KEYS, 'Navigation');
-  assertUniqueKeysAndOrder(body.homepageSections as any[], HOMEPAGE_SECTION_KEYS, 'Homepage sections');
+  const submitted = body.storefrontNavigation as any[];
+  const navigation = normalizeOrder(submitted.map(raw => {
+    const defaults = DEFAULT_STOREFRONT_NAVIGATION.find(item => item.key === raw?.key);
+    return normalizeNavigationItem(raw, defaults);
+  }));
+  validateNavigationGraph(navigation);
 
-  const navigation = normalizeStoredNavigation(body.storefrontNavigation).map(item => {
-    const submitted = (body.storefrontNavigation as any[]).find(candidate => candidate.key === item.key);
-    const label = cleanText(submitted.label, 40);
-    if (!label) throw new Error(`Navigation label is required for ${item.key}`);
-    return {
-      ...item,
-      label,
-      path: DEFAULT_STOREFRONT_NAVIGATION.find(defaultItem => defaultItem.key === item.key)!.path,
-      visible: submitted.visible === true,
-      enabled: submitted.enabled === true,
-      showOnDesktop: submitted.showOnDesktop === true,
-      showOnMobile: submitted.showOnMobile === true,
-      order: Number(submitted.order)
-    };
-  }).sort((a, b) => a.order - b.order);
-
-  const homepageSections = normalizeStoredHomepageSections(body.homepageSections).map(section => {
-    const submitted = (body.homepageSections as any[]).find(candidate => candidate.key === section.key);
-    const defaultSection = DEFAULT_HOMEPAGE_SECTIONS.find(item => item.key === section.key)!;
-    return {
-      ...section,
-      enabled: submitted.enabled === true,
-      order: Number(submitted.order),
-      heading: cleanText(submitted.heading, 120) || defaultSection.heading,
-      subheading: cleanText(submitted.subheading, 320) || defaultSection.subheading,
-      ctaLabel: defaultSection.ctaLabel
-        ? cleanText(submitted.ctaLabel, 60) || defaultSection.ctaLabel
-        : undefined,
-      ctaLink: defaultSection.ctaLink
-        ? safeInternalLink(submitted.ctaLink, defaultSection.ctaLink)
-        : undefined
-    };
-  }).sort((a, b) => a.order - b.order);
-
+  const sectionKeys = (body.homepageSections as any[]).map(item => item?.key);
+  if (sectionKeys.length !== HOMEPAGE_SECTION_KEYS.length || new Set(sectionKeys).size !== sectionKeys.length || sectionKeys.some(key => !HOMEPAGE_SECTION_KEYS.includes(key))) {
+    throw new Error('Homepage sections must include every stable key exactly once');
+  }
+  const homepageSections = normalizeStoredHomepageSections(body.homepageSections);
   return { navigation, homepageSections };
 };

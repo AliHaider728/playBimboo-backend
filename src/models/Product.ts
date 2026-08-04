@@ -30,6 +30,7 @@ export interface IProduct extends Document {
   reviewCount: number;
   category?: string;
   categorySlug?: string;
+  categoryId?: string;
   ageGroup?: string;
   ageGroups: SupportedAgeGroup[];
   brand: string;
@@ -73,6 +74,7 @@ const ProductSchema = new Schema<IProduct>(
     reviewCount: { type: Number, default: 0 },
     category: { type: String, default: '' },
     categorySlug: { type: String, default: '' },
+    categoryId: { type: String, default: '' },
     // ageGroup remains readable for old production documents while ageGroups is
     // the canonical field for all new writes.
     ageGroup: { type: String },

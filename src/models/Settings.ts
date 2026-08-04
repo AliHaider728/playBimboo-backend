@@ -22,14 +22,24 @@ export interface ISettings extends Document {
 }
 
 const StorefrontNavigationSchema = new Schema<StorefrontNavigationItem>({
+  id: { type: String, required: true, maxlength: 80 },
   key: { type: String, required: true },
-  label: { type: String, required: true, maxlength: 40 },
-  path: { type: String, required: true, maxlength: 200 },
+  label: { type: String, required: true, maxlength: 50 },
+  linkType: { type: String, enum: ['internal_page', 'category', 'custom_internal_url', 'external_url'], required: true },
+  menuType: { type: String, enum: ['link', 'dropdown'], default: 'link' },
+  path: { type: String, maxlength: 200 },
+  externalUrl: { type: String, maxlength: 500 },
+  categoryId: { type: String },
+  parentId: { type: String, default: null },
   visible: { type: Boolean, default: true },
   enabled: { type: Boolean, default: true },
   showOnDesktop: { type: Boolean, default: true },
   showOnMobile: { type: Boolean, default: true },
-  order: { type: Number, required: true, min: 0 }
+  displayOrder: { type: Number, required: true, min: 0 },
+  order: { type: Number, min: 0 },
+  badgeText: { type: String, maxlength: 20 },
+  openInNewTab: { type: Boolean, default: false },
+  isSystemItem: { type: Boolean, default: false }
 }, { _id: false });
 
 const HomepageSectionSchema = new Schema<HomepageSectionSetting>({

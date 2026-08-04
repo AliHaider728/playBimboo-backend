@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import Product from '../models/Product.js';
+import Category from '../models/Category.js';
 import multer from 'multer';
 import csvParser from 'csv-parser';
 import { Parser } from 'json2csv';
@@ -110,6 +111,7 @@ const serializeProduct = (value: any, reviewSummary?: ReviewSummary) => {
     : [];
   product.category = typeof product.category === 'string' ? product.category : '';
   product.categorySlug = typeof product.categorySlug === 'string' ? product.categorySlug : '';
+  product.categoryId = typeof product.categoryId === 'string' ? product.categoryId : '';
   product.rating = reviewSummary?.rating ?? 0;
   product.reviewCount = reviewSummary?.reviewCount ?? 0;
   return product;
@@ -182,6 +184,7 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
   const descriptionText = description.replace(/<[^>]+>/g, '').trim();
   const category = sanitizePlainText(merged.category, 120);
   const categorySlug = category ? createSlug(merged.categorySlug || category) : '';
+  const categoryId = sanitizePlainText(merged.categoryId, 80);
   const slug = createSlug(merged.slug || name);
   const ageGroups = normalizeAgeGroups(merged.ageGroups, merged.ageGroup);
   const productDetailBlocks = normalizeProductDetailBlocks(merged.productDetailBlocks);
@@ -328,6 +331,7 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
     reviewCount: Number.isFinite(Number(current?.reviewCount)) ? Number(current?.reviewCount) : 0,
     category,
     categorySlug,
+    categoryId: category ? categoryId : '',
     ageGroups,
     brand: sanitizePlainText(merged.brand, 100) || 'PlayBimboo',
     ...inventory,
@@ -363,6 +367,13 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
     productDetailCustomCss: productDetailCss.raw,
     productDetailScopedCss: productDetailCss.scoped
   };
+};
+
+const resolveCategoryReference = async (payload: ReturnType<typeof normalizeProductPayload>) => {
+  if (!payload.categoryId) return payload;
+  const category = await Category.findOne({ _id: payload.categoryId, isActive: { $ne: false } });
+  if (!category) throw new Error('Selected category is unavailable');
+  return { ...payload, category: category.name, categorySlug: category.slug, categoryId: category.id };
 };
 
 const assertUniqueIdentifiers = async (
@@ -501,7 +512,7 @@ router.post('/import/csv', authenticateToken, requireAdmin, upload.single('file'
           ? item.images.split(',').map(value => value.trim()).filter(Boolean)
           : existing?.images || ['https://images.unsplash.com/photo-1587654780291-39c9404d746b?auto=format&fit=crop&w=600&q=80']
       };
-      const payload = normalizeProductPayload(input, existing?.toObject());
+      const payload = await resolveCategoryReference(normalizeProductPayload(input, existing?.toObject()));
       await assertUniqueIdentifiers(payload, existing?.id);
       if (existing) {
         existing.set(payload);
@@ -544,7 +555,7 @@ router.post('/', authenticateToken, requireAdmin, async (req: AuthRequest, res: 
     if (req.user?.role !== 'super_admin' && requestChangesCustomCode(req.body)) {
       return res.status(403).json({ error: 'Only a Super Admin can add custom HTML or CSS.' });
     }
-    const payload = normalizeProductPayload(req.body);
+    const payload = await resolveCategoryReference(normalizeProductPayload(req.body));
     await assertUniqueIdentifiers(payload);
     const newProduct = new Product(payload);
     await newProduct.save();
@@ -565,7 +576,7 @@ router.put('/:id', authenticateToken, requireAdmin, async (req: AuthRequest, res
     if (req.user?.role !== 'super_admin' && requestChangesCustomCode(req.body, current)) {
       return res.status(403).json({ error: 'Only a Super Admin can update custom HTML or CSS.' });
     }
-    const payload = normalizeProductPayload(req.body, current);
+    const payload = await resolveCategoryReference(normalizeProductPayload(req.body, current));
     await assertUniqueIdentifiers(payload, product.id);
     const oldPublicIds = getProductImagePublicIds(current);
     const newPublicIds = getProductImagePublicIds(payload);

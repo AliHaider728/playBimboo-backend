@@ -117,6 +117,32 @@ test('appearance validation keeps stable keys and protected routes', () => {
   }), /every stable key/i);
 });
 
+test('appearance validation supports safe custom links and one child level', () => {
+  const parent = {
+    id: 'nav-custom-parent', key: 'custom-parent', label: 'Explore', linkType: 'custom_internal_url',
+    menuType: 'dropdown', parentId: null, visible: true, enabled: true, showOnDesktop: true,
+    showOnMobile: true, displayOrder: 7, isSystemItem: false
+  };
+  const child = {
+    id: 'nav-custom-child', key: 'custom-child', label: 'New Toys', linkType: 'custom_internal_url',
+    menuType: 'link', path: '/category/all?sort=new', parentId: parent.id, visible: true, enabled: true,
+    showOnDesktop: true, showOnMobile: true, displayOrder: 0, isSystemItem: false
+  };
+  const result = validateAppearanceInput({
+    storefrontNavigation: [...DEFAULT_STOREFRONT_NAVIGATION, parent, child],
+    homepageSections: DEFAULT_HOMEPAGE_SECTIONS
+  });
+  assert.equal(result.navigation.find(item => item.id === child.id)?.path, '/category/all?sort=new');
+  assert.throws(() => validateAppearanceInput({
+    storefrontNavigation: [...DEFAULT_STOREFRONT_NAVIGATION, { ...child, id: 'unsafe', key: 'unsafe', parentId: null, path: '/admin/users' }],
+    homepageSections: DEFAULT_HOMEPAGE_SECTIONS
+  }), /safe public paths/i);
+  assert.throws(() => validateAppearanceInput({
+    storefrontNavigation: [...DEFAULT_STOREFRONT_NAVIGATION, { ...child, id: 'external', key: 'external', parentId: null, linkType: 'external_url', path: undefined, externalUrl: 'javascript:alert(1)' }],
+    homepageSections: DEFAULT_HOMEPAGE_SECTIONS
+  }), /HTTPS URLs/i);
+});
+
 const authorizationResult = (middleware: typeof requireAdmin, role?: string) => {
   let status = 200;
   let nextCalled = false;

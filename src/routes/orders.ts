@@ -77,7 +77,8 @@ export const validateItemStock = (product: any, quantity: number, selectedVarian
 
 const adjustProductStock = async (productId: string, quantityDelta: number, selectedVariant?: string) => {
   const product: any = await Product.findById(productId);
-  if (!product) return;
+  if (!product) return false;
+  let adjusted = false;
 
   if (hasVariantGroups(product)) {
     const selections = parseVariantSelection(selectedVariant);
@@ -91,6 +92,7 @@ const adjustProductStock = async (productId: string, quantityDelta: number, sele
           option.stockQuantity = Math.max(0, (inventory.stockQuantity || 0) + quantityDelta);
           option.stockStatus = option.stockQuantity > 0 ? 'in_stock' : 'out_of_stock';
           option.inStock = option.stockQuantity > 0;
+          adjusted = true;
         }
       }
     }
@@ -101,9 +103,11 @@ const adjustProductStock = async (productId: string, quantityDelta: number, sele
       product.stockQuantity = Math.max(0, (inventory.stockQuantity || 0) + quantityDelta);
       product.stockStatus = product.stockQuantity > 0 ? 'in_stock' : 'out_of_stock';
       product.inStock = product.stockQuantity > 0;
+      adjusted = true;
     }
   }
   await product.save();
+  return adjusted;
 };
 
 // GET all orders (with optional email filter for customer history)
@@ -233,7 +237,9 @@ router.post('/', async (req: Request, res: Response) => {
       } else if (deliveryType === 'fixed') {
         highestOverrideFee = Math.max(highestOverrideFee, Number(product.customDeliveryFee || 0));
       } else if (deliveryType === 'category') {
-        const category = await Category.findOne({ slug: product.categorySlug });
+        const category = product.categoryId
+          ? await Category.findById(product.categoryId)
+          : await Category.findOne({ slug: product.categorySlug });
         if (category?.deliveryCharge !== undefined) {
           highestOverrideFee = Math.max(highestOverrideFee, Number(category.deliveryCharge));
         } else {
@@ -362,10 +368,17 @@ router.put('/:orderId/status', authenticateToken, requireAdmin, async (req: Requ
 
     const statusChanged = previousOrder.status !== status;
     const transitionedToDelivered = statusChanged && status === 'Delivered';
+    const notification = {
+      emailStatus: 'not_applicable' as 'not_applicable' | 'sent' | 'failed' | 'already_sent',
+      inventoryRestored: false,
+      alreadyDelivered: !statusChanged && status === 'Delivered'
+    };
 
     if (statusChanged && status === 'Cancelled') {
       for (const item of order.items) {
-        if (item.productId) await adjustProductStock(item.productId, item.quantity, item.selectedVariant);
+        if (item.productId) {
+          notification.inventoryRestored = (await adjustProductStock(item.productId, item.quantity, item.selectedVariant)) || notification.inventoryRestored;
+        }
       }
     } else if (statusChanged && previousOrder.status === 'Cancelled') {
       try {
@@ -396,14 +409,18 @@ router.put('/:orderId/status', authenticateToken, requireAdmin, async (req: Requ
           order.deliveredEmailAccepted = delivery.acceptedCount > 0;
           order.deliveredEmailFailedAt = undefined;
           order.deliveredEmailFailureCode = undefined;
+          notification.emailStatus = 'sent';
         } catch (error) {
           const failureCode = getEmailFailureCode(error);
           order.deliveredEmailAccepted = false;
           order.deliveredEmailFailedAt = new Date();
           order.deliveredEmailFailureCode = failureCode;
           logEmailFailure('Delivered order', order.orderId, error);
+          notification.emailStatus = 'failed';
         }
         await order.save();
+      } else {
+        notification.emailStatus = 'already_sent';
       }
     } else if (statusChanged) {
       void sendOrderStatusEmail(order).catch(error =>
@@ -411,7 +428,8 @@ router.put('/:orderId/status', authenticateToken, requireAdmin, async (req: Requ
       );
     }
 
-    res.json(order);
+    if (notification.alreadyDelivered && order.deliveredEmailSentAt) notification.emailStatus = 'already_sent';
+    res.json({ order, notification });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }

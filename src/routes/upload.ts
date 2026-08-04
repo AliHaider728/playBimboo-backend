@@ -1,13 +1,16 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
-import { authenticateToken, requireAdmin } from '../middleware/auth.js';
+import { authenticateToken, requireAdmin, requireSuperAdmin } from '../middleware/auth.js';
 import {
+  deleteCategoryImage,
   deleteProductImage,
   hasCloudinaryConfiguration,
   uploadProductDetailImage,
-  uploadProductImage
+  uploadProductImage,
+  uploadCategoryImage
 } from '../lib/cloudinary.js';
 import Product from '../models/Product.js';
+import Category from '../models/Category.js';
 import { connectToDatabase } from '../lib/database.js';
 
 const router = Router();
@@ -65,6 +68,52 @@ router.post(
     } catch {
       console.error('Cloudinary image upload failed.');
       res.status(502).json({ error: 'Cloudinary image upload failed' });
+    }
+  }
+);
+
+router.post(
+  '/category-image',
+  authenticateToken,
+  requireSuperAdmin,
+  requireCloudinaryConfiguration,
+  upload.single('image'),
+  async (req: Request, res: Response) => {
+    if (!req.file) return res.status(400).json({ error: 'No image file uploaded' });
+    try {
+      const result = await uploadCategoryImage(req.file);
+      res.json({ secureUrl: result.url, url: result.url, publicId: result.publicId });
+    } catch {
+      console.error('Cloudinary category image upload failed.');
+      res.status(502).json({ error: 'Cloudinary category image upload failed' });
+    }
+  }
+);
+
+router.delete(
+  '/category-image',
+  authenticateToken,
+  requireSuperAdmin,
+  requireCloudinaryConfiguration,
+  async (req: Request, res: Response) => {
+    const publicId = typeof req.body?.publicId === 'string' ? req.body.publicId.trim() : '';
+    if (!publicId) return res.status(400).json({ error: 'Cloudinary public ID is required' });
+    try {
+      await connectToDatabase();
+      if (await Category.exists({ imagePublicId: publicId })) {
+        return res.status(409).json({ error: 'This image is attached to a saved category.' });
+      }
+      const result = await deleteCategoryImage(publicId);
+      if (!['ok', 'not found'].includes(result.result)) {
+        return res.status(502).json({ error: 'Cloudinary did not confirm image deletion' });
+      }
+      res.json({ deleted: true });
+    } catch (error) {
+      console.error('Cloudinary category image deletion failed.');
+      const message = error instanceof Error && error.message.startsWith('Invalid PlayBimboo')
+        ? error.message
+        : 'Cloudinary category image deletion failed';
+      res.status(message.startsWith('Invalid') ? 400 : 502).json({ error: message });
     }
   }
 );

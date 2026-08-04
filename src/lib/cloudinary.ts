@@ -3,6 +3,7 @@ import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
 
 export const PRODUCT_IMAGE_FOLDER = 'playbimboo/products';
 export const PRODUCT_DETAIL_IMAGE_FOLDER = `${PRODUCT_IMAGE_FOLDER}/detail-content`;
+export const CATEGORY_IMAGE_FOLDER = 'playbimboo/categories';
 
 export const hasCloudinaryConfiguration = Boolean(
   process.env.CLOUDINARY_CLOUD_NAME &&
@@ -26,6 +27,10 @@ export const isProductImagePublicId = (publicId: string) =>
 export const isProductDetailImagePublicId = (publicId: string) =>
   publicId.startsWith(`${PRODUCT_DETAIL_IMAGE_FOLDER}/`) &&
   publicId.length > PRODUCT_DETAIL_IMAGE_FOLDER.length + 1;
+
+export const isCategoryImagePublicId = (publicId: string) =>
+  publicId.startsWith(`${CATEGORY_IMAGE_FOLDER}/`) &&
+  publicId.length > CATEGORY_IMAGE_FOLDER.length + 1;
 
 const uploadProductImageToFolder = (file: Express.Multer.File, folder: string) =>
   new Promise<{ url: string; publicId: string }>((resolve, reject) => {
@@ -61,6 +66,9 @@ export const uploadProductImage = (file: Express.Multer.File) =>
 export const uploadProductDetailImage = (file: Express.Multer.File) =>
   uploadProductImageToFolder(file, PRODUCT_DETAIL_IMAGE_FOLDER);
 
+export const uploadCategoryImage = (file: Express.Multer.File) =>
+  uploadProductImageToFolder(file, CATEGORY_IMAGE_FOLDER);
+
 export const deleteProductImage = async (publicId: string) => {
   if (!isProductImagePublicId(publicId)) {
     throw new Error('Invalid PlayBimboo product image public ID');
@@ -84,4 +92,9 @@ export const deleteProductImages = async (publicIds: string[]) => {
   }
 
   return failedPublicIds;
+};
+
+export const deleteCategoryImage = async (publicId: string) => {
+  if (!isCategoryImagePublicId(publicId)) throw new Error('Invalid PlayBimboo category image public ID');
+  return cloudinary.uploader.destroy(publicId, { resource_type: 'image', invalidate: true });
 };
