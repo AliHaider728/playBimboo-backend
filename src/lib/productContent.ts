@@ -2,12 +2,11 @@ import { randomUUID } from 'node:crypto';
 import sanitizeHtml from 'sanitize-html';
 import { isProductDetailImagePublicId } from './cloudinary.js';
 
-export const SUPPORTED_AGE_GROUPS = ['0-2', '3-5', '6-8', '8+'] as const;
+export const SUPPORTED_AGE_GROUPS = ['0-2', '3-5', '6-8', '9-12', '13+'] as const;
 export type SupportedAgeGroup = typeof SUPPORTED_AGE_GROUPS[number];
-const LEGACY_AGE_GROUP_ALIASES: Record<string, SupportedAgeGroup> = {
-  '9-11': '8+',
-  '9-12': '8+',
-  '13+': '8+'
+const LEGACY_AGE_GROUP_ALIASES: Record<string, SupportedAgeGroup[]> = {
+  '9-11': ['9-12'],
+  '8+': ['9-12', '13+']
 };
 export type ProductDetailBlockType = 'richText' | 'image' | 'html' | 'divider';
 
@@ -152,17 +151,18 @@ export const sanitizeAndScopeProductCss = (value: unknown, slug: string) => {
 };
 
 export const normalizeAgeGroups = (ageGroups: unknown, legacyAgeGroup?: unknown): SupportedAgeGroup[] => {
-  const values = Array.isArray(ageGroups)
+  const submittedValues = Array.isArray(ageGroups)
     ? ageGroups.map(value => String(value).trim())
     : legacyAgeGroup
-      ? [LEGACY_AGE_GROUP_ALIASES[String(legacyAgeGroup).trim()] || String(legacyAgeGroup).trim()]
+      ? [String(legacyAgeGroup).trim()]
       : [];
-  if (values.length === 0) throw new Error('Select at least one supported age group');
-  if (new Set(values).size !== values.length) throw new Error('Age groups cannot contain duplicates');
+  if (submittedValues.length === 0) throw new Error('Select at least one supported age group');
+  if (new Set(submittedValues).size !== submittedValues.length) throw new Error('Age groups cannot contain duplicates');
+  const values = submittedValues.flatMap(value => LEGACY_AGE_GROUP_ALIASES[value] || [value]);
   if (values.some(value => !SUPPORTED_AGE_GROUPS.includes(value as SupportedAgeGroup))) {
     throw new Error('One or more age groups are not supported');
   }
-  return values as SupportedAgeGroup[];
+  return [...new Set(values)] as SupportedAgeGroup[];
 };
 
 export const normalizeProductDetailBlocks = (value: unknown): ProductDetailBlock[] => {

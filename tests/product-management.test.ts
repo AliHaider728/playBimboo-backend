@@ -16,7 +16,8 @@ import { requestChangesCustomCode } from '../src/routes/products.js';
 
 test('multi-age normalization supports legacy reads and canonical multi-select writes', () => {
   assert.deepEqual(normalizeAgeGroups(undefined, '3-5'), ['3-5']);
-  assert.deepEqual(normalizeAgeGroups(undefined, '9-11'), ['8+']);
+  assert.deepEqual(normalizeAgeGroups(undefined, '9-11'), ['9-12']);
+  assert.deepEqual(normalizeAgeGroups(undefined, '8+'), ['9-12', '13+']);
   assert.deepEqual(normalizeAgeGroups(['0-2', '6-8']), ['0-2', '6-8']);
   assert.throws(() => normalizeAgeGroups([]), /at least one/i);
   assert.throws(() => normalizeAgeGroups(['3-5', '3-5']), /duplicates/i);

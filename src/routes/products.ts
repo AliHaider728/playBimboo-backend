@@ -374,12 +374,20 @@ router.get('/', async (req: Request, res: Response) => {
       if (!SUPPORTED_AGE_GROUPS.includes(ageGroup as any)) {
         return res.status(400).json({ error: 'Unsupported age group filter' });
       }
-      const legacyAgeValues = ageGroup === '8+'
-        ? ['8+', '9-11', '9-12', '13+']
+      const legacyAgeValues = ageGroup === '9-12'
+        ? ['9-12', '9-11', '8+']
+        : ageGroup === '13+'
+          ? ['13+', '8+']
+          : [ageGroup];
+      const legacyArrayValues = ['9-12', '13+'].includes(String(ageGroup))
+        ? [ageGroup, '8+']
         : [ageGroup];
       filter.$and = [
         ...(filter.$and || []),
-        { $or: [{ ageGroups: ageGroup }, { ageGroup: { $in: legacyAgeValues } }] }
+        { $or: [
+          { ageGroups: { $in: legacyArrayValues } },
+          { ageGroup: { $in: legacyAgeValues } }
+        ] }
       ];
     }
     if (isVisible !== undefined) {

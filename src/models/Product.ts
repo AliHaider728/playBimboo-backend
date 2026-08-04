@@ -72,7 +72,7 @@ const ProductSchema = new Schema<IProduct>(
     // the canonical field for all new writes.
     ageGroup: { type: String },
     ageGroups: {
-      type: [{ type: String, enum: ['0-2', '3-5', '6-8', '8+'] }],
+      type: [{ type: String, enum: ['0-2', '3-5', '6-8', '9-12', '13+'] }],
       default: undefined,
       validate: {
         validator: (groups?: string[]) => !groups || groups.length > 0,
