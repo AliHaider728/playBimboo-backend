@@ -4,12 +4,18 @@ import multer from 'multer';
 import csvParser from 'csv-parser';
 import { Parser } from 'json2csv';
 import { Readable } from 'node:stream';
-import { authenticateToken, requireAdmin } from '../middleware/auth.js';
+import { AuthRequest, authenticateToken, requireAdmin } from '../middleware/auth.js';
 import {
   deleteProductImages,
   hasCloudinaryConfiguration,
   isProductImagePublicId
 } from '../lib/cloudinary.js';
+import {
+  normalizeAgeGroups,
+  normalizeProductDetailBlocks,
+  sanitizeAndScopeProductCss,
+  SUPPORTED_AGE_GROUPS
+} from '../lib/productContent.js';
 
 const router = Router();
 const upload = multer({
@@ -88,6 +94,66 @@ const createSlug = (value: unknown): string =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '');
 
+const safelyNormalizeAgeGroups = (product: Record<string, any>) => {
+  try {
+    return normalizeAgeGroups(product.ageGroups, product.ageGroup);
+  } catch {
+    return [];
+  }
+};
+
+const serializeProduct = (value: any) => {
+  const product = typeof value?.toObject === 'function' ? value.toObject() : { ...value };
+  product.ageGroups = safelyNormalizeAgeGroups(product);
+  delete product.ageGroup;
+  product.productDetailBlocks = Array.isArray(product.productDetailBlocks)
+    ? product.productDetailBlocks
+    : [];
+  return product;
+};
+
+const getProductImagePublicIds = (product: Record<string, any>) => [
+  ...(Array.isArray(product.imagePublicIds) ? product.imagePublicIds : []),
+  ...(Array.isArray(product.productDetailBlocks)
+    ? product.productDetailBlocks.map((block: any) => block?.image?.publicId)
+    : [])
+].filter((value): value is string => typeof value === 'string' && value.length > 0);
+
+const deleteImagesUnusedByOtherProducts = async (publicIds: string[], excludedProductId: string) => {
+  const uniqueIds = [...new Set(publicIds)];
+  if (uniqueIds.length === 0) return;
+  const referenced = await Product.find({
+    _id: { $ne: excludedProductId },
+    $or: [
+      { imagePublicIds: { $in: uniqueIds } },
+      { 'productDetailBlocks.image.publicId': { $in: uniqueIds } }
+    ]
+  }).select('imagePublicIds productDetailBlocks.image.publicId').lean();
+  const referencedIds = new Set(referenced.flatMap(product => getProductImagePublicIds(product)));
+  const safeToDelete = uniqueIds.filter(publicId => !referencedIds.has(publicId));
+  if (safeToDelete.length > 0) await deleteProductImages(safeToDelete);
+};
+
+export const requestChangesCustomCode = (body: Record<string, any>, current?: Record<string, any>) => {
+  if (body.productDetailCustomCss !== undefined &&
+      String(body.productDetailCustomCss) !== String(current?.productDetailCustomCss || '')) return true;
+  if (body.productDetailBlocks === undefined) return false;
+  const codeBlocks = (blocks: unknown) => Array.isArray(blocks)
+    ? blocks
+        .filter((block: any) => block?.type === 'html')
+        .map((block: any) => ({
+          id: block.id,
+          type: block.type,
+          enabled: block.enabled !== false,
+          order: block.order,
+          content: block.content || '',
+          settings: block.settings || {}
+        }))
+    : [];
+  return JSON.stringify(codeBlocks(body.productDetailBlocks)) !==
+    JSON.stringify(codeBlocks(current?.productDetailBlocks));
+};
+
 const normalizeProductPayload = (body: Record<string, any>, current?: Record<string, any>) => {
   const merged: Record<string, any> = {
     ...(current || {}),
@@ -103,8 +169,10 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
   const descriptionText = description.replace(/<[^>]+>/g, '').trim();
   const category = sanitizePlainText(merged.category, 120);
   const categorySlug = createSlug(merged.categorySlug || category);
-  const ageGroup = sanitizePlainText(merged.ageGroup, 40);
   const slug = createSlug(merged.slug || name);
+  const ageGroups = normalizeAgeGroups(merged.ageGroups, merged.ageGroup);
+  const productDetailBlocks = normalizeProductDetailBlocks(merged.productDetailBlocks);
+  const productDetailCss = sanitizeAndScopeProductCss(merged.productDetailCustomCss, slug);
   const price = toNumber(merged.price, 'Price') as number;
   const originalPrice = toNumber(merged.originalPrice, 'Regular price', { optional: true });
   const stockQuantity = toNumber(merged.stockQuantity, 'Stock quantity', { integer: true }) as number;
@@ -120,7 +188,6 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
   if (!name) throw new Error('Product name is required');
   if (!descriptionText) throw new Error('Detailed description is required');
   if (!category || !categorySlug) throw new Error('Category is required');
-  if (!ageGroup) throw new Error('Age recommendation is required');
   if (!slug || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
     throw new Error('URL slug must contain lowercase letters, numbers, and hyphens only');
   }
@@ -231,7 +298,7 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
     reviewCount: Number.isFinite(Number(merged.reviewCount)) ? Number(merged.reviewCount) : 0,
     category,
     categorySlug,
-    ageGroup,
+    ageGroups,
     brand: sanitizePlainText(merged.brand, 100) || 'PlayBimboo',
     inStock: Boolean(merged.inStock) && stockQuantity > 0,
     stockQuantity,
@@ -261,7 +328,10 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
       ? merged.tags.map((tag: unknown) => sanitizePlainText(tag, 60)).filter(Boolean)
       : [],
     metaTitle,
-    metaDescription
+    metaDescription,
+    productDetailBlocks,
+    productDetailCustomCss: productDetailCss.raw,
+    productDetailScopedCss: productDetailCss.scoped
   };
 };
 
@@ -301,16 +371,28 @@ router.get('/', async (req: Request, res: Response) => {
       filter.categorySlug = category;
     }
     if (ageGroup && ageGroup !== 'all') {
-      filter.ageGroup = ageGroup;
+      if (!SUPPORTED_AGE_GROUPS.includes(ageGroup as any)) {
+        return res.status(400).json({ error: 'Unsupported age group filter' });
+      }
+      const legacyAgeValues = ageGroup === '8+'
+        ? ['8+', '9-11', '9-12', '13+']
+        : [ageGroup];
+      filter.$and = [
+        ...(filter.$and || []),
+        { $or: [{ ageGroups: ageGroup }, { ageGroup: { $in: legacyAgeValues } }] }
+      ];
     }
     if (isVisible !== undefined) {
       filter.isVisible = isVisible === 'true';
     }
     if (search) {
-      filter.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { brand: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
+      filter.$and = [
+        ...(filter.$and || []),
+        { $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { brand: { $regex: search, $options: 'i' } },
+          { description: { $regex: search, $options: 'i' } }
+        ] }
       ];
     }
 
@@ -320,25 +402,80 @@ router.get('/', async (req: Request, res: Response) => {
     }
 
     const products = await query.exec();
-    res.json(products);
+    res.json(products.map(serializeProduct));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
 // GET Export CSV
-router.get('/export/csv', async (req: Request, res: Response) => {
+router.get('/export/csv', authenticateToken, requireAdmin, async (_req: Request, res: Response) => {
   try {
     const products = await Product.find().lean();
-    const fields = ['_id', 'name', 'slug', 'price', 'originalPrice', 'category', 'categorySlug', 'ageGroup', 'brand', 'stockQuantity', 'isVisible', 'deliveryType', 'description'];
+    const exportProducts = products.map(product => ({
+      ...serializeProduct(product),
+      ageGroups: safelyNormalizeAgeGroups(product).join('|')
+    }));
+    const fields = ['_id', 'name', 'slug', 'price', 'originalPrice', 'category', 'categorySlug', 'ageGroups', 'brand', 'stockQuantity', 'isVisible', 'deliveryType', 'description'];
     const json2csvParser = new Parser({ fields });
-    const csv = json2csvParser.parse(products);
+    const csv = json2csvParser.parse(exportProducts);
 
     res.header('Content-Type', 'text/csv');
     res.attachment('playbimboo-products.csv');
     return res.send(csv);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// POST Import CSV (must remain before /:idOrSlug)
+router.post('/import/csv', authenticateToken, requireAdmin, upload.single('file'), async (req: Request, res: Response) => {
+  if (!req.file) return res.status(400).json({ error: 'Please upload a CSV file' });
+
+  try {
+    const rows = await parseCsvBuffer(req.file.buffer);
+    let imported = 0;
+    for (const item of rows) {
+      if (!item.name || !item.price) continue;
+      const slug = createSlug(item.slug || item.name);
+      const existing = await Product.findOne({ slug });
+      const ageGroups = (item.ageGroups || item.ageGroup || '3-5')
+        .split(/[|,]/)
+        .map(value => value.trim())
+        .filter(Boolean);
+      const input = {
+        ...(existing?.toObject() || {}),
+        name: item.name,
+        slug,
+        price: Number(item.price),
+        originalPrice: item.originalPrice ? Number(item.originalPrice) : undefined,
+        category: item.category || 'Toys',
+        categorySlug: item.categorySlug || 'toys',
+        ageGroups,
+        brand: item.brand || 'PlayBimboo',
+        stockQuantity: Number(item.stockQuantity) || 10,
+        inStock: Number(item.stockQuantity) !== 0,
+        description: item.description || 'Quality toy for kids.',
+        isVisible: item.isVisible !== 'false',
+        images: item.images
+          ? item.images.split(',').map(value => value.trim()).filter(Boolean)
+          : existing?.images || ['https://images.unsplash.com/photo-1587654780291-39c9404d746b?auto=format&fit=crop&w=600&q=80']
+      };
+      const payload = normalizeProductPayload(input, existing?.toObject());
+      await assertUniqueIdentifiers(payload, existing?.id);
+      if (existing) {
+        existing.set(payload);
+        existing.set('ageGroup', undefined);
+        await existing.save();
+      } else {
+        await new Product(payload).save();
+      }
+      imported += 1;
+    }
+    res.json({ message: `Successfully imported ${imported} products` });
+  } catch (err: any) {
+    const isConflict = err?.code === 11000 || /already used|unique/i.test(err.message);
+    res.status(isConflict ? 409 : 400).json({ error: err.message });
   }
 });
 
@@ -354,20 +491,23 @@ router.get('/:idOrSlug', async (req: Request, res: Response) => {
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
     }
-    res.json(product);
+    res.json(serializeProduct(product));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
 // POST Create Product
-router.post('/', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+router.post('/', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
+    if (req.user?.role !== 'super_admin' && requestChangesCustomCode(req.body)) {
+      return res.status(403).json({ error: 'Only a Super Admin can add custom HTML or CSS.' });
+    }
     const payload = normalizeProductPayload(req.body);
     await assertUniqueIdentifiers(payload);
     const newProduct = new Product(payload);
     await newProduct.save();
-    res.status(201).json(newProduct);
+    res.status(201).json(serializeProduct(newProduct));
   } catch (err: any) {
     const isConflict = err?.code === 11000 || /already used|unique/i.test(err.message);
     res.status(isConflict ? 409 : 400).json({ error: err.message });
@@ -375,16 +515,21 @@ router.post('/', authenticateToken, requireAdmin, async (req: Request, res: Resp
 });
 
 // PUT Update Product
-router.put('/:id', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+router.put('/:id', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ error: 'Product not found' });
 
-    const payload = normalizeProductPayload(req.body, product.toObject());
+    const current = product.toObject();
+    if (req.user?.role !== 'super_admin' && requestChangesCustomCode(req.body, current)) {
+      return res.status(403).json({ error: 'Only a Super Admin can update custom HTML or CSS.' });
+    }
+    const payload = normalizeProductPayload(req.body, current);
     await assertUniqueIdentifiers(payload, product.id);
-    const oldPublicIds = (product.imagePublicIds || []).filter(Boolean);
+    const oldPublicIds = getProductImagePublicIds(current);
+    const newPublicIds = getProductImagePublicIds(payload);
     const removedPublicIds = oldPublicIds.filter(
-      publicId => !payload.imagePublicIds.includes(publicId)
+      publicId => !newPublicIds.includes(publicId)
     );
     if (removedPublicIds.length > 0 && !hasCloudinaryConfiguration) {
       return res.status(503).json({
@@ -392,9 +537,12 @@ router.put('/:id', authenticateToken, requireAdmin, async (req: Request, res: Re
       });
     }
     product.set(payload);
+    product.set('ageGroup', undefined);
     await product.save();
-    if (removedPublicIds.length > 0) await deleteProductImages(removedPublicIds);
-    res.json(product);
+    if (removedPublicIds.length > 0) {
+      await deleteImagesUnusedByOtherProducts(removedPublicIds, product.id);
+    }
+    res.json(serializeProduct(product));
   } catch (err: any) {
     const isConflict = err?.code === 11000 || /already used|unique/i.test(err.message);
     res.status(isConflict ? 409 : 400).json({ error: err.message });
@@ -406,54 +554,17 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req: Request, res:
   try {
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ error: 'Product not found' });
-    const publicIds = (product.imagePublicIds || []).filter(Boolean);
+    const publicIds = getProductImagePublicIds(product.toObject());
     if (publicIds.length > 0 && !hasCloudinaryConfiguration) {
       return res.status(503).json({
         error: 'Cannot delete this product because Cloudinary image cleanup is not configured.'
       });
     }
     await product.deleteOne();
-    if (publicIds.length > 0) await deleteProductImages(publicIds);
-    res.json({ message: 'Product deleted successfully' });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// POST Import CSV
-router.post('/import/csv', authenticateToken, requireAdmin, upload.single('file'), async (req: Request, res: Response) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'Please upload a CSV file' });
-  }
-
-  try {
-    const results = await parseCsvBuffer(req.file.buffer);
-
-    for (const item of results) {
-      if (item.name && item.price) {
-        const slug = item.slug || item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-        await Product.findOneAndUpdate(
-          { slug },
-          {
-            name: item.name,
-            slug,
-            price: Number(item.price),
-            originalPrice: item.originalPrice ? Number(item.originalPrice) : undefined,
-            category: item.category || 'Toys',
-            categorySlug: item.categorySlug || 'toys',
-            ageGroup: item.ageGroup || '3-5',
-            brand: item.brand || 'PlayBimboo',
-            stockQuantity: Number(item.stockQuantity) || 10,
-            description: item.description || 'Quality toy for kids.',
-            isVisible: item.isVisible === 'false' ? false : true,
-            images: item.images ? item.images.split(',') : ['https://images.unsplash.com/photo-1587654780291-39c9404d746b?auto=format&fit=crop&w=600&q=80']
-          },
-          { upsert: true, new: true }
-        );
-      }
+    if (publicIds.length > 0) {
+      await deleteImagesUnusedByOtherProducts(publicIds, product.id);
     }
-
-    res.json({ message: `Successfully imported ${results.length} products` });
+    res.json({ message: 'Product deleted successfully' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

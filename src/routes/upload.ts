@@ -4,8 +4,11 @@ import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import {
   deleteProductImage,
   hasCloudinaryConfiguration,
+  uploadProductDetailImage,
   uploadProductImage
 } from '../lib/cloudinary.js';
+import Product from '../models/Product.js';
+import { connectToDatabase } from '../lib/database.js';
 
 const router = Router();
 
@@ -66,6 +69,34 @@ router.post(
   }
 );
 
+// POST a product-detail content image into its dedicated Cloudinary folder
+router.post(
+  '/detail-content-image',
+  authenticateToken,
+  requireAdmin,
+  requireCloudinaryConfiguration,
+  upload.single('image'),
+  async (req: Request, res: Response) => {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file uploaded' });
+    }
+
+    try {
+      const result = await uploadProductDetailImage(req.file);
+      res.json({
+        url: result.url,
+        secureUrl: result.url,
+        publicId: result.publicId,
+        mimetype: req.file.mimetype,
+        size: req.file.size
+      });
+    } catch {
+      console.error('Cloudinary product-detail image upload failed.');
+      res.status(502).json({ error: 'Cloudinary image upload failed' });
+    }
+  }
+);
+
 // DELETE a newly uploaded image that was discarded before the product was saved
 router.delete(
   '/image',
@@ -77,6 +108,18 @@ router.delete(
     if (!publicId) return res.status(400).json({ error: 'Cloudinary public ID is required' });
 
     try {
+      await connectToDatabase();
+      const referencedProduct = await Product.exists({
+        $or: [
+          { imagePublicIds: publicId },
+          { 'productDetailBlocks.image.publicId': publicId }
+        ]
+      });
+      if (referencedProduct) {
+        return res.status(409).json({
+          error: 'This image is attached to a saved product and must be removed through the product editor.'
+        });
+      }
       const result = await deleteProductImage(publicId);
       if (!['ok', 'not found'].includes(result.result)) {
         return res.status(502).json({ error: 'Cloudinary did not confirm image deletion' });

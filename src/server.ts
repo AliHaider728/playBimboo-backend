@@ -44,8 +44,8 @@ const requireDatabaseConnection = async (
   try {
     await connectToDatabase();
     next();
-  } catch (error) {
-    console.error('MongoDB request connection failed:', error);
+  } catch {
+    console.error('MongoDB request connection failed.');
     res.status(503).json({ error: 'Database connection unavailable' });
   }
 };
@@ -57,8 +57,8 @@ app.get('/api/health', async (_req: Request, res: Response) => {
       status: 'ok',
       dbConnected: mongoose.connection.readyState === 1
     });
-  } catch (error) {
-    console.error('MongoDB health check failed:', error);
+  } catch {
+    console.error('MongoDB health check failed.');
     res.status(503).json({
       status: 'error',
       dbConnected: false,

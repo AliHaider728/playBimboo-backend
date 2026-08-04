@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import { ProductDetailBlock, SupportedAgeGroup } from '../lib/productContent.js';
 
 export interface IProductVariantOption {
   id: string;
@@ -26,7 +27,8 @@ export interface IProduct extends Document {
   reviewCount: number;
   category: string;
   categorySlug: string;
-  ageGroup: string;
+  ageGroup?: string;
+  ageGroups: SupportedAgeGroup[];
   brand: string;
   inStock: boolean;
   stockQuantity: number;
@@ -48,6 +50,9 @@ export interface IProduct extends Document {
   tags?: string[];
   metaTitle?: string;
   metaDescription?: string;
+  productDetailBlocks: ProductDetailBlock[];
+  productDetailCustomCss?: string;
+  productDetailScopedCss?: string;
   createdAt: Date;
 }
 
@@ -63,7 +68,17 @@ const ProductSchema = new Schema<IProduct>(
     reviewCount: { type: Number, default: 0 },
     category: { type: String, required: true },
     categorySlug: { type: String, required: true },
-    ageGroup: { type: String, required: true },
+    // ageGroup remains readable for old production documents while ageGroups is
+    // the canonical field for all new writes.
+    ageGroup: { type: String },
+    ageGroups: {
+      type: [{ type: String, enum: ['0-2', '3-5', '6-8', '8+'] }],
+      default: undefined,
+      validate: {
+        validator: (groups?: string[]) => !groups || groups.length > 0,
+        message: 'Select at least one supported age group'
+      }
+    },
     brand: { type: String, default: 'PlayBimboo' },
     inStock: { type: Boolean, default: true },
     stockQuantity: { type: Number, default: 10, min: 0 },
@@ -112,7 +127,30 @@ const ProductSchema = new Schema<IProduct>(
     specifications: { type: Schema.Types.Mixed },
     tags: [{ type: String }],
     metaTitle: { type: String, maxlength: 70 },
-    metaDescription: { type: String, maxlength: 180 }
+    metaDescription: { type: String, maxlength: 180 },
+    productDetailBlocks: {
+      type: [new Schema({
+        id: { type: String, required: true, maxlength: 80 },
+        type: { type: String, required: true, enum: ['richText', 'image', 'html', 'divider'] },
+        enabled: { type: Boolean, default: true },
+        order: { type: Number, required: true, min: 0 },
+        heading: { type: String, maxlength: 140 },
+        content: { type: String, maxlength: 30000 },
+        image: {
+          secureUrl: { type: String },
+          publicId: { type: String },
+          alt: { type: String, maxlength: 180 },
+          caption: { type: String, maxlength: 300 }
+        },
+        settings: {
+          width: { type: String, enum: ['full', 'large', 'medium'], default: 'full' },
+          alignment: { type: String, enum: ['left', 'center', 'right'], default: 'center' }
+        }
+      }, { _id: false })],
+      default: []
+    },
+    productDetailCustomCss: { type: String, maxlength: 10000 },
+    productDetailScopedCss: { type: String, maxlength: 30000 }
   },
   { timestamps: true }
 );
