@@ -95,7 +95,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
     const { email } = req.query;
     const filter: any = {};
 
-    if (req.user?.role === 'admin') {
+    if (['admin', 'super_admin'].includes(req.user?.role || '')) {
       if (typeof email === 'string' && email.trim()) {
         filter.email = email.trim().toLowerCase();
       }
@@ -117,7 +117,7 @@ router.get('/:orderId', authenticateToken, async (req: AuthRequest, res: Respons
     if (!order) return res.status(404).json({ error: 'Order not found' });
 
     const canViewOrder =
-      req.user?.role === 'admin' ||
+      ['admin', 'super_admin'].includes(req.user?.role || '') ||
       order.email.toLowerCase() === req.user?.email.toLowerCase();
     if (!canViewOrder) {
       return res.status(403).json({ error: 'Access denied' });
