@@ -7,7 +7,9 @@ import {
   getEmailFailureCode,
   sendOrderConfirmationEmail,
   sendOrderDeliveredEmail,
-  sendOrderStatusEmail
+  sendOrderStatusEmail,
+  sendAdminNewOrderEmail,
+  getAdminNotificationRecipients
 } from '../utils/mailer.js';
 import { authenticateToken, requireAdmin, AuthRequest } from '../middleware/auth.js';
 import { hasVariantGroups, normalizeInventory } from '../lib/inventory.js';
@@ -32,6 +34,31 @@ const sendAndTrackOrderConfirmation = async (order: any) => {
     order.confirmationEmailFailedAt = new Date();
     order.confirmationEmailFailureCode = getEmailFailureCode(error);
     logEmailFailure('Order confirmation', order.orderId, error);
+  }
+  await order.save();
+};
+
+const sendAndTrackAdminNewOrderNotification = async (order: any) => {
+  if (order.newOrderEmailSentAt) return;
+  order.newOrderEmailAttemptedAt = new Date();
+
+  const recipients = getAdminNotificationRecipients();
+  if (recipients.length === 0) {
+    order.newOrderEmailError = 'NEW_ORDER_RECIPIENT_NOT_CONFIGURED';
+    await order.save();
+    return;
+  }
+
+  order.newOrderEmailRecipients = recipients;
+
+  try {
+    const delivery = await sendAdminNewOrderEmail(order, recipients);
+    order.newOrderEmailSentAt = new Date();
+    order.newOrderEmailMessageId = delivery.messageId;
+    order.newOrderEmailError = undefined;
+  } catch (error) {
+    order.newOrderEmailError = getEmailFailureCode(error);
+    logEmailFailure('Admin new order', order.orderId, error);
   }
   await order.save();
 };
@@ -297,6 +324,7 @@ router.post('/', async (req: Request, res: Response) => {
 
     // The order remains valid if SMTP fails; only a sanitized failure state is persisted.
     await sendAndTrackOrderConfirmation(newOrder);
+    await sendAndTrackAdminNewOrderNotification(newOrder);
 
     res.status(201).json(newOrder);
   } catch (err: any) {

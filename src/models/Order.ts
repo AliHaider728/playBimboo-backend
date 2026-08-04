@@ -47,6 +47,11 @@ export interface IOrder extends Document {
   deliveredEmailAccepted?: boolean;
   deliveredEmailFailedAt?: Date;
   deliveredEmailFailureCode?: string;
+  newOrderEmailSentAt?: Date;
+  newOrderEmailMessageId?: string;
+  newOrderEmailError?: string;
+  newOrderEmailRecipients?: string[];
+  newOrderEmailAttemptedAt?: Date;
   createdAt: Date;
 }
 
@@ -99,7 +104,12 @@ const OrderSchema = new Schema<IOrder>(
     deliveredEmailMessageId: { type: String, maxlength: 500 },
     deliveredEmailAccepted: { type: Boolean },
     deliveredEmailFailedAt: { type: Date },
-    deliveredEmailFailureCode: { type: String, maxlength: 100 }
+    deliveredEmailFailureCode: { type: String, maxlength: 100 },
+    newOrderEmailSentAt: { type: Date },
+    newOrderEmailMessageId: { type: String, maxlength: 500 },
+    newOrderEmailError: { type: String, maxlength: 100 },
+    newOrderEmailRecipients: [{ type: String }],
+    newOrderEmailAttemptedAt: { type: Date }
   },
   { timestamps: true }
 );

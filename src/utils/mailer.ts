@@ -286,3 +286,128 @@ export const sendOrderStatusEmail = async (order: any) => {
   };
   return sendEmail(String(order.email || ''), content);
 };
+
+export const getAdminNotificationRecipients = (): string[] => {
+  const raw = process.env.NEW_ORDER_NOTIFICATION_EMAILS || '';
+  const emails = raw.split(',').map(e => e.trim()).filter(e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+  return Array.from(new Set(emails));
+};
+
+export const buildAdminNewOrderEmail = (order: any): EmailContent => {
+  const items = Array.isArray(order.items) ? order.items : [];
+  const itemsHtml = items.map((item: any) => {
+    const quantity = Math.max(1, Number(item.quantity) || 1);
+    const itemPrice = Number(item.price) || 0;
+    const variant = item.selectedVariant
+      ? `<div style="color:#64748b;font-size:12px;margin-top:4px;">${escapeHtml(item.selectedVariant)}</div>`
+      : '';
+    const skuHtml = item.sku ? `<div style="color:#64748b;font-size:12px;margin-top:2px;">SKU: ${escapeHtml(item.sku)}</div>` : '';
+    return `<tr>
+      <td style="padding:13px 0;border-bottom:1px solid #e2e8f0;"><strong style="color:#0f172a;">${escapeHtml(item.name || 'Product')}</strong>${variant}${skuHtml}</td>
+      <td style="padding:13px 8px;border-bottom:1px solid #e2e8f0;text-align:center;color:#475569;">${quantity}</td>
+      <td style="padding:13px 8px;border-bottom:1px solid #e2e8f0;text-align:right;color:#475569;">${formatPkr(itemPrice)}</td>
+      <td style="padding:13px 0;border-bottom:1px solid #e2e8f0;text-align:right;color:#0f172a;font-weight:700;">${formatPkr(itemPrice * quantity)}</td>
+    </tr>`;
+  }).join('');
+  
+  const address = order.shippingAddress || {};
+  const fullAddress = [address.street, address.city, address.state, address.postalCode, address.country]
+    .map(value => String(value || '').trim())
+    .filter(Boolean)
+    .join(', ');
+  
+  const customerName = String(order.customerName || address.fullName || 'Customer');
+  const orderId = String(order.orderId || 'Order');
+  const orderDate = formatDeliveryDate(order.createdAt || order.date || new Date());
+  const paymentMethod = String(order.paymentMethod || 'Cash on Delivery (COD)');
+  const orderStatus = String(order.status || 'Pending');
+  const contactPhone = String(address.phone || order.phone || '').trim();
+  const customerEmail = String(order.email || '').trim();
+  const discount = Math.max(0, Number(order.discountAmount) || 0);
+  const discountHtml = discount > 0
+    ? `<tr><td style="padding:5px 0;color:#64748b;">Discount</td><td style="padding:5px 0;text-align:right;color:#15803d;font-weight:700;">-${formatPkr(discount)}</td></tr>`
+    : '';
+
+  const adminUrlBase = process.env.ADMIN_APP_URL || process.env.FRONTEND_URL || '';
+  const adminOrderUrl = adminUrlBase ? `${adminUrlBase.replace(/\/$/, '')}/admin/orders/${orderId}` : '/admin/orders';
+  const subject = `New PlayBimboo Order Received - ${orderId} - ${formatPkr(order.total)}`;
+  
+  const html = `<!doctype html>
+  <html lang="en"><body style="margin:0;background:#f8fafc;font-family:Arial,sans-serif;color:#334155;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8fafc;padding:24px 12px;"><tr><td align="center">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #e2e8f0;border-radius:20px;overflow:hidden;">
+        <tr><td style="background:#0f172a;padding:28px;text-align:center;">
+          <h1 style="color:#ffffff;font-size:24px;margin:0;">You've received a new order</h1>
+        </td></tr>
+        <tr><td style="padding:32px 28px;">
+          <h3 style="color:#0f172a;font-size:16px;margin:0 0 8px;">Order summary</h3>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom:20px;background:#f8fafc;border-radius:12px;padding:12px;">
+            <tr><td style="padding:5px;color:#64748b;">Order number</td><td style="padding:5px;text-align:right;font-weight:700;color:#0f172a;">${escapeHtml(orderId)}</td></tr>
+            <tr><td style="padding:5px;color:#64748b;">Order date</td><td style="padding:5px;text-align:right;font-weight:700;color:#0f172a;">${escapeHtml(orderDate)}</td></tr>
+            <tr><td style="padding:5px;color:#64748b;">Status</td><td style="padding:5px;text-align:right;font-weight:700;color:#b45309;">${escapeHtml(orderStatus)}</td></tr>
+            <tr><td style="padding:5px;color:#64748b;">Payment</td><td style="padding:5px;text-align:right;font-weight:700;color:${paymentMethod.includes('COD') ? '#e11d48' : '#0f172a'};">${escapeHtml(paymentMethod)}</td></tr>
+          </table>
+
+          <h3 style="color:#0f172a;font-size:16px;margin:0 0 8px;">Customer details</h3>
+          <div style="background:#f8fafc;border-radius:14px;padding:16px;margin-bottom:22px;">
+            <p style="margin:0;line-height:1.6;color:#334155;">
+              <strong>Name:</strong> ${escapeHtml(customerName)}<br/>
+              <strong>Email:</strong> ${escapeHtml(customerEmail)}<br/>
+              <strong>Phone:</strong> ${escapeHtml(contactPhone)}
+            </p>
+          </div>
+
+          <h3 style="color:#0f172a;font-size:16px;margin:0 0 8px;">Delivery details</h3>
+          <div style="background:#f8fafc;border-radius:14px;padding:16px;margin-bottom:22px;">
+            <p style="margin:0;line-height:1.6;color:#334155;">
+              ${escapeHtml(fullAddress)}
+              ${order.shippingAddress?.instructions ? `<br/><br/><strong>Instructions:</strong> ${escapeHtml(order.shippingAddress.instructions)}` : ''}
+            </p>
+          </div>
+
+          <h3 style="color:#0f172a;font-size:16px;margin:0 0 8px;">Order items</h3>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;"><tr style="color:#64748b;font-size:11px;text-transform:uppercase;"><th align="left" style="padding-bottom:8px;">Product</th><th style="padding-bottom:8px;">Qty</th><th align="right" style="padding-bottom:8px;">Price</th><th align="right" style="padding-bottom:8px;">Amount</th></tr>${itemsHtml}</table>
+          
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:16px 0 24px;">
+            <tr><td style="padding:5px 0;color:#64748b;">Subtotal</td><td style="padding:5px 0;text-align:right;font-weight:700;">${formatPkr(order.subtotal)}</td></tr>
+            <tr><td style="padding:5px 0;color:#64748b;">Delivery charges</td><td style="padding:5px 0;text-align:right;font-weight:700;">${formatPkr(order.deliveryCharge)}</td></tr>${discountHtml}
+            <tr><td style="padding:10px 0 0;color:#0f172a;font-size:17px;font-weight:800;">Final total</td><td style="padding:10px 0 0;text-align:right;color:#e11d48;font-size:19px;font-weight:900;">${formatPkr(order.total)}</td></tr>
+          </table>
+
+          <div style="text-align:center;margin-top:32px;">
+            <a href="${escapeHtml(adminOrderUrl)}" style="display:inline-block;background:#0f172a;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 24px;border-radius:8px;">View Order in Admin</a>
+          </div>
+        </td></tr>
+      </table>
+    </td></tr></table>
+  </body></html>`;
+
+  const text = [
+    `New PlayBimboo Order Received - ${orderId}`,
+    `Order Date: ${orderDate}`,
+    `Status: ${orderStatus}`,
+    `Payment: ${paymentMethod}`,
+    '',
+    'CUSTOMER DETAILS',
+    `Name: ${customerName}`,
+    `Email: ${customerEmail}`,
+    `Phone: ${contactPhone}`,
+    '',
+    'DELIVERY DETAILS',
+    fullAddress,
+    '',
+    `Total: ${formatPkr(order.total)}`,
+    '',
+    `View Order in Admin: ${adminOrderUrl}`
+  ].join('\n');
+
+  return { subject, html, text };
+};
+
+export const sendAdminNewOrderEmail = async (order: any, recipients: string[]) => {
+  if (!recipients || recipients.length === 0) {
+    throw new EmailDispatchError('NEW_ORDER_RECIPIENT_NOT_CONFIGURED');
+  }
+  const to = recipients.join(',');
+  return sendEmail(to, buildAdminNewOrderEmail(order));
+};
