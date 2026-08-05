@@ -13,8 +13,9 @@ export const getApprovedReviewSummaries = async (products: Array<Record<string, 
     String(product._id || product.id || ''),
     String(product.slug || '')
   ]).filter(Boolean);
+  
   const reviews = productTokens.length > 0
-    ? await Review.find({ productId: { $in: productTokens }, isApproved: true }).select('productId rating').lean()
+    ? await Review.find({ productId: { $in: productTokens }, status: 'approved' }).select('productId rating').lean()
     : [];
 
   return new Map(products.map(product => {
@@ -34,6 +35,6 @@ export const recalculateProductReviewSummary = async (productId: string) => {
   if (!product) return { ...EMPTY_SUMMARY };
   const summaries = await getApprovedReviewSummaries([product.toObject()]);
   const summary = summaries.get(String(product.id)) || { ...EMPTY_SUMMARY };
-  await Product.findByIdAndUpdate(product.id, summary);
+  await Product.findByIdAndUpdate(product.id, { rating: summary.rating, reviewCount: summary.reviewCount });
   return summary;
 };
