@@ -219,7 +219,7 @@ const scopeCssRules = (css: string, wrapper: string): string => {
           /(^|[\s>+~])(html|body|header|nav|footer)([\s>+~.#:[\]]|$)/i.test(item) ||
           /:root|:global|#|\.admin\b|\.checkout\b|\.modal\b|\[data-portal/i.test(item)
         ) {
-          throw new Error('Custom CSS selector targets a protected global element');
+          throw new Error(`Selector \`${item}\` is not allowed in product-scoped CSS`);
         }
         return `${wrapper} ${item}`;
       });
