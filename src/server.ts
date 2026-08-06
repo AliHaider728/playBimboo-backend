@@ -11,6 +11,7 @@ import reviewRoutes from './routes/reviews.js';
 import authRoutes from './routes/auth.js';
 import uploadRoutes from './routes/upload.js';
 import seedRoutes from './routes/seed.js';
+import globalAttributeRoutes from './routes/globalAttributes.js';
 
 const app = express();
 
@@ -69,6 +70,7 @@ app.get('/api/health', async (_req: Request, res: Response) => {
 
 app.use('/api/categories', requireDatabaseConnection, categoryRoutes);
 app.use('/api/products', requireDatabaseConnection, productRoutes);
+app.use('/api/global-attributes', requireDatabaseConnection, globalAttributeRoutes);
 app.use('/api/orders', requireDatabaseConnection, orderRoutes);
 app.use('/api/coupons', requireDatabaseConnection, couponRoutes);
 app.use('/api/settings', requireDatabaseConnection, settingsRoutes);

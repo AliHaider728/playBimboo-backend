@@ -20,6 +20,7 @@ import {
 } from '../lib/productContent.js';
 import { normalizeInventory } from '../lib/inventory.js';
 import { getApprovedReviewSummaries, ReviewSummary } from '../lib/productReviews.js';
+import { syncProductGlobalAttributes } from '../lib/globalAttributes.js';
 
 const router = Router();
 const upload = multer({
@@ -309,6 +310,91 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
         .filter((group: any) => group.name && group.options.length > 0)
     : [];
 
+  const productType = merged.productType === 'variable' ? 'variable' : 'simple';
+
+  const attributes = Array.isArray(merged.attributes)
+    ? merged.attributes.map((attr: any, attrIndex: number) => {
+        const displayType = ['dropdown', 'buttons', 'radio', 'color_swatches', 'image_swatches'].includes(attr.displayType) 
+          ? attr.displayType 
+          : 'buttons';
+        return {
+          source: attr.source === 'global' ? 'global' : 'custom',
+          globalAttributeId: attr.source === 'global' ? sanitizePlainText(attr.globalAttributeId, 80) : undefined,
+          id: sanitizePlainText(attr.id, 80) || `attr-${attrIndex + 1}`,
+          name: sanitizePlainText(attr.name, 80),
+          slug: createSlug(attr.slug || attr.name),
+          displayType,
+          terms: Array.isArray(attr.terms) ? attr.terms.map((t: any) => ({
+            id: sanitizePlainText(t.id, 80),
+            label: sanitizePlainText(t.label, 80),
+            slug: createSlug(t.slug || t.label),
+            value: sanitizePlainText(t.value, 80),
+            colorValue: sanitizePlainText(t.colorValue, 20) || undefined,
+            imageUrl: typeof t.imageUrl === 'string' && t.imageUrl.startsWith('http') ? t.imageUrl : undefined,
+            imageAlt: sanitizePlainText(t.imageAlt, 80) || undefined,
+            position: Number(t.position) || 0
+          })).filter((t: any) => t.label && t.value && t.slug) : [],
+          selectedTermIds: Array.isArray(attr.selectedTermIds) ? attr.selectedTermIds.map((id: string) => sanitizePlainText(id, 80)) : [],
+          visible: attr.visible !== false,
+          usedForVariations: attr.usedForVariations !== false,
+          position: Number(attr.position) || attrIndex,
+          displayTypeOverride: attr.displayTypeOverride ? sanitizePlainText(attr.displayTypeOverride, 20) : undefined
+        };
+      }).filter((attr: any) => attr.name && attr.slug)
+    : [];
+
+  const variations = Array.isArray(merged.variations)
+    ? merged.variations.map((variation: any, varIndex: number) => {
+        const varTracksInventory = typeof variation.manageStock === 'boolean'
+          ? variation.manageStock
+          : variation.stockQuantity !== undefined && variation.stockQuantity !== null && variation.stockQuantity !== '';
+        const varStock = varTracksInventory
+          ? toNumber(variation.stockQuantity, 'Variation stock', { integer: true }) as number
+          : undefined;
+        const varInventory = normalizeInventory({
+          ...variation,
+          trackInventory: varTracksInventory,
+          stockQuantity: varStock
+        });
+
+        const attrMap: Record<string, string> = {};
+        if (variation.attributes && typeof variation.attributes === 'object') {
+          for (const [k, v] of Object.entries(variation.attributes)) {
+            attrMap[sanitizePlainText(k, 80)] = sanitizePlainText(v, 80);
+          }
+        }
+
+        const salePrice = toNumber(variation.salePrice, 'Variation sale price', { optional: true });
+        const regularPrice = toNumber(variation.regularPrice, 'Variation regular price') || price;
+        if (salePrice !== undefined && salePrice >= regularPrice) {
+          throw new Error('Variation sale price must be lower than regular price');
+        }
+
+        return {
+          id: sanitizePlainText(variation.id, 80) || `var-${varIndex + 1}`,
+          attributes: attrMap,
+          enabled: variation.enabled !== false,
+          sku: sanitizePlainText(variation.sku, 80).toUpperCase() || undefined,
+          regularPrice,
+          salePrice,
+          image: typeof variation.image === 'string' ? variation.image.trim() : undefined,
+          ...varInventory,
+          manageStock: varInventory.trackInventory,
+          stockQuantity: varInventory.trackInventory ? varInventory.stockQuantity : null,
+          lowStockThreshold: varInventory.trackInventory ? varInventory.lowStockThreshold : null,
+          weight: toNumber(variation.weight, 'Variation weight', { optional: true }),
+          description: sanitizePlainText(variation.description, 500)
+        };
+      })
+    : [];
+
+  const defaultAttributes: Record<string, string> = {};
+  if (merged.defaultAttributes && typeof merged.defaultAttributes === 'object') {
+    for (const [k, v] of Object.entries(merged.defaultAttributes)) {
+      defaultAttributes[sanitizePlainText(k, 80)] = sanitizePlainText(v, 80);
+    }
+  }
+
   const sku = sanitizePlainText(merged.sku, 80).toUpperCase() || undefined;
   const skuValues = [sku, ...variants.flatMap((group: any) => group.options.map((option: any) => option.sku))]
     .filter((value): value is string => Boolean(value));
@@ -348,6 +434,10 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
     deliveryType,
     customDeliveryFee: deliveryType === 'fixed' ? customDeliveryFee : undefined,
     variants,
+    productType,
+    attributes,
+    variations,
+    defaultAttributes,
     features: Array.isArray(merged.features)
       ? merged.features.map((feature: unknown) => sanitizePlainText(feature, 160)).filter(Boolean)
       : [],
@@ -365,7 +455,8 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
     metaDescription,
     productDetailBlocks,
     productDetailCustomCss: productDetailCss.raw,
-    productDetailScopedCss: productDetailCss.scoped
+    productDetailScopedCss: productDetailCss.scoped,
+    sizeGuide: sanitizeProductDescription(merged.sizeGuide) || undefined
   };
 };
 
@@ -389,16 +480,17 @@ const assertUniqueIdentifiers = async (
     product.sku,
     ...product.variants.flatMap((group: any) =>
       group.options.map((option: any) => option.sku)
-    )
+    ),
+    ...product.variations.map((v: any) => v.sku)
   ].filter((value): value is string => Boolean(value));
   if (
     skus.length > 0 &&
     (await Product.exists({
       ...idFilter,
-      $or: [{ sku: { $in: skus } }, { 'variants.options.sku': { $in: skus } }]
+      $or: [{ sku: { $in: skus } }, { 'variants.options.sku': { $in: skus } }, { 'variations.sku': { $in: skus } }]
     }))
   ) {
-    throw new Error('SKU is already used by another product or variant');
+    throw new Error('SKU is already used by another product or variation');
   }
 };
 
@@ -518,6 +610,7 @@ router.post('/import/csv', authenticateToken, requireAdmin, upload.single('file'
           : existing?.images || ['https://images.unsplash.com/photo-1587654780291-39c9404d746b?auto=format&fit=crop&w=600&q=80']
       };
       const payload = await resolveCategoryReference(normalizeProductPayload(input, existing?.toObject()));
+      payload.attributes = await syncProductGlobalAttributes(payload.attributes);
       await assertUniqueIdentifiers(payload, existing?.id);
       if (existing) {
         existing.set(payload);
@@ -563,6 +656,7 @@ router.post('/', authenticateToken, requireAdmin, async (req: AuthRequest, res: 
       return res.status(403).json({ error: 'Only a Super Admin can add custom HTML or CSS.' });
     }
     const payload = await resolveCategoryReference(normalizeProductPayload(req.body));
+    payload.attributes = await syncProductGlobalAttributes(payload.attributes);
     await assertUniqueIdentifiers(payload);
     const newProduct = new Product(payload);
     await newProduct.save();
@@ -584,6 +678,7 @@ router.put('/:id', authenticateToken, requireAdmin, async (req: AuthRequest, res
       return res.status(403).json({ error: 'Only a Super Admin can update custom HTML or CSS.' });
     }
     const payload = await resolveCategoryReference(normalizeProductPayload(req.body, current));
+    payload.attributes = await syncProductGlobalAttributes(payload.attributes);
     await assertUniqueIdentifiers(payload, product.id);
     const oldPublicIds = getProductImagePublicIds(current);
     const newPublicIds = getProductImagePublicIds(payload);

@@ -102,12 +102,25 @@ export const validateItemStock = (product: any, quantity: number, selectedVarian
   }
 };
 
-const adjustProductStock = async (productId: string, quantityDelta: number, selectedVariant?: string) => {
+const adjustProductStock = async (productId: string, quantityDelta: number, selectedVariant?: string, variationId?: string) => {
   const product: any = await Product.findById(productId);
   if (!product) return false;
   let adjusted = false;
 
-  if (hasVariantGroups(product)) {
+  if (product.productType === 'variable' && variationId) {
+    const variation = product.variations?.find((v: any) => String(v.id) === String(variationId));
+    if (variation) {
+      const inventory = normalizeInventory(variation);
+      if (inventory.trackInventory) {
+        // Fallback to fetch-and-save to trigger Mongoose middleware if needed, but atomic decrement is preferred.
+        // We'll use save() here to remain consistent with legacy, but the validation in checkout prevents overselling.
+        variation.trackInventory = true;
+        variation.stockQuantity = Math.max(0, (inventory.stockQuantity || 0) + quantityDelta);
+        variation.stockStatus = variation.stockQuantity > 0 ? 'in_stock' : 'out_of_stock';
+        adjusted = true;
+      }
+    }
+  } else if (hasVariantGroups(product)) {
     const selections = parseVariantSelection(selectedVariant);
     for (const group of product.variants || []) {
       const selectedName = selections.get(group.name);
@@ -133,7 +146,9 @@ const adjustProductStock = async (productId: string, quantityDelta: number, sele
       adjusted = true;
     }
   }
-  await product.save();
+  if (adjusted) {
+    await product.save();
+  }
   return adjusted;
 };
 
@@ -206,51 +221,89 @@ router.post('/', async (req: Request, res: Response) => {
       if (!product || product.isVisible === false || product.status === 'draft') {
         return res.status(400).json({ error: 'One or more products are unavailable' });
       }
-      validateItemStock(product, Number(item.quantity), item.selectedVariant);
+
       const productKey = String(product.id);
-      if (!hasVariantGroups(product)) {
-        const productInventory = normalizeInventory(product);
-        if (productInventory.trackInventory) {
-          const requestedProductQuantity =
-            (requestedProductQuantities.get(productKey) || 0) + Number(item.quantity);
-          if (requestedProductQuantity > (productInventory.stockQuantity || 0)) {
-            return res.status(400).json({ error: `${product.name} does not have enough stock` });
-          }
-          requestedProductQuantities.set(productKey, requestedProductQuantity);
+      verifiedProducts.set(productKey, product);
+
+      if (product.productType === 'variable') {
+        const variationId = item.variationId;
+        if (!variationId) {
+          return res.status(400).json({ error: `Please select a variation for ${product.name}` });
         }
-      }
-      verifiedProducts.set(String(product.id), product);
-      const selections = parseVariantSelection(item.selectedVariant);
-      for (const group of product.variants || []) {
-        const selectedName = selections.get(group.name);
-        const option = group.options?.find((candidate: any) => candidate.name === selectedName);
-        const optionInventory = option ? normalizeInventory(option) : undefined;
-        if (option && optionInventory?.trackInventory) {
-          const variantKey = `${productKey}:${group.name}:${option.name}`;
-          const requestedVariantQuantity =
-            (requestedVariantQuantities.get(variantKey) || 0) + Number(item.quantity);
-          if (requestedVariantQuantity > (optionInventory.stockQuantity || 0)) {
-            return res.status(400).json({
-              error: `${product.name} – ${option.name} does not have enough stock`
-            });
+        const variation = product.variations?.find((v: any) => String(v.id) === String(variationId));
+        if (!variation || !variation.enabled) {
+          return res.status(400).json({ error: `The selected variation for ${product.name} is unavailable. Please select again.` });
+        }
+        
+        const varInventory = normalizeInventory(variation);
+        if (varInventory.trackInventory) {
+          const variantKey = `${productKey}:${variation.id}`;
+          const requestedVariantQuantity = (requestedVariantQuantities.get(variantKey) || 0) + Number(item.quantity);
+          if (requestedVariantQuantity > (varInventory.stockQuantity || 0)) {
+            return res.status(400).json({ error: `${product.name} does not have enough stock for the selected variation` });
           }
           requestedVariantQuantities.set(variantKey, requestedVariantQuantity);
         }
+
+        const unitPrice = variation.salePrice !== undefined && variation.salePrice !== null ? variation.salePrice : variation.regularPrice;
+        computedSubtotal += unitPrice * Number(item.quantity);
+        canonicalItems.push({
+          productId: String(product.id),
+          productType: 'variable',
+          name: product.name,
+          price: unitPrice,
+          quantity: Number(item.quantity),
+          image: variation.image || product.images?.[0] || '',
+          variationId: String(variation.id),
+          sku: variation.sku || product.sku,
+          selectedAttributes: variation.attributes
+        });
+      } else {
+        validateItemStock(product, Number(item.quantity), item.selectedVariant);
+        if (!hasVariantGroups(product)) {
+          const productInventory = normalizeInventory(product);
+          if (productInventory.trackInventory) {
+            const requestedProductQuantity =
+              (requestedProductQuantities.get(productKey) || 0) + Number(item.quantity);
+            if (requestedProductQuantity > (productInventory.stockQuantity || 0)) {
+              return res.status(400).json({ error: `${product.name} does not have enough stock` });
+            }
+            requestedProductQuantities.set(productKey, requestedProductQuantity);
+          }
+        }
+        const selections = parseVariantSelection(item.selectedVariant);
+        for (const group of product.variants || []) {
+          const selectedName = selections.get(group.name);
+          const option = group.options?.find((candidate: any) => candidate.name === selectedName);
+          const optionInventory = option ? normalizeInventory(option) : undefined;
+          if (option && optionInventory?.trackInventory) {
+            const variantKey = `${productKey}:${group.name}:${option.name}`;
+            const requestedVariantQuantity =
+              (requestedVariantQuantities.get(variantKey) || 0) + Number(item.quantity);
+            if (requestedVariantQuantity > (optionInventory.stockQuantity || 0)) {
+              return res.status(400).json({
+                error: `${product.name} – ${option.name} does not have enough stock`
+              });
+            }
+            requestedVariantQuantities.set(variantKey, requestedVariantQuantity);
+          }
+        }
+        const variantOffset = (product.variants || []).reduce((sum: number, group: any) => {
+          const option = group.options?.find((candidate: any) => candidate.name === selections.get(group.name));
+          return sum + Number(option?.priceOffset || 0);
+        }, 0);
+        const unitPrice = product.price + variantOffset;
+        computedSubtotal += unitPrice * Number(item.quantity);
+        canonicalItems.push({
+          productId: String(product.id),
+          productType: 'simple',
+          name: product.name,
+          price: unitPrice,
+          quantity: Number(item.quantity),
+          image: product.images?.[0] || '',
+          selectedVariant: item.selectedVariant // Legacy
+        });
       }
-      const variantOffset = (product.variants || []).reduce((sum: number, group: any) => {
-        const option = group.options?.find((candidate: any) => candidate.name === selections.get(group.name));
-        return sum + Number(option?.priceOffset || 0);
-      }, 0);
-      const unitPrice = product.price + variantOffset;
-      computedSubtotal += unitPrice * Number(item.quantity);
-      canonicalItems.push({
-        productId: String(product.id),
-        name: product.name,
-        price: unitPrice,
-        quantity: Number(item.quantity),
-        image: product.images?.[0] || '',
-        selectedVariant: item.selectedVariant
-      });
     }
 
     const settings = (await Settings.findOne()) || new Settings({});
@@ -316,9 +369,17 @@ router.post('/', async (req: Request, res: Response) => {
     await newOrder.save();
 
     // Deduct stock for ordered products
-    for (const item of items) {
+    for (const item of canonicalItems) {
       if (item.productId) {
-        await adjustProductStock(item.productId, -item.quantity, item.selectedVariant);
+        // Atomic deduction via findOneAndUpdate
+        if (item.productType === 'variable' && item.variationId) {
+           await Product.findOneAndUpdate(
+             { _id: item.productId, 'variations.id': item.variationId },
+             { $inc: { 'variations.$.stockQuantity': -item.quantity } }
+           );
+        } else {
+           await adjustProductStock(item.productId, -item.quantity, item.selectedVariant);
+        }
       }
     }
 

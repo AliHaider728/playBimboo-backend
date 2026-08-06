@@ -42,7 +42,7 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
 
   jwt.verify(token, secret, (err: any, decoded: any) => {
     if (err) {
-      return res.status(403).json({ error: 'Invalid or expired session token.' });
+      return res.status(401).json({ error: 'Invalid or expired session token.' });
     }
     req.user = decoded as { userId: string; email: string; role: string };
     next();

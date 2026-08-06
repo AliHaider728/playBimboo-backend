@@ -8,7 +8,23 @@ const LEGACY_AGE_GROUP_ALIASES: Record<string, SupportedAgeGroup[]> = {
   '9-11': ['9-12'],
   '8+': ['9-12', '13+']
 };
-export type ProductDetailBlockType = 'richText' | 'image' | 'html' | 'divider';
+export type ProductDetailBlockType =
+  | 'heading'
+  | 'richText'
+  | 'image'
+  | 'imageText'
+  | 'fullWidthImage'
+  | 'gallery'
+  | 'featureCards'
+  | 'iconText'
+  | 'benefitsList'
+  | 'whatsIncluded'
+  | 'recommendedAge'
+  | 'giftBadges'
+  | 'divider'
+  | 'spacer'
+  | 'ctaBanner'
+  | 'html';
 
 export interface ProductDetailBlock {
   id: string;
@@ -17,6 +33,13 @@ export interface ProductDetailBlock {
   order: number;
   heading?: string;
   content?: string;
+  items?: Record<string, any>[];
+  images?: {
+    secureUrl: string;
+    publicId: string;
+    alt: string;
+    caption?: string;
+  }[];
   image?: {
     secureUrl: string;
     publicId: string;
@@ -26,6 +49,11 @@ export interface ProductDetailBlock {
   settings?: {
     width?: 'full' | 'large' | 'medium';
     alignment?: 'left' | 'center' | 'right';
+    background?: string;
+    spacing?: 'none' | 'small' | 'medium' | 'large';
+    responsiveVisibility?: 'all' | 'desktop' | 'mobile';
+    imagePosition?: 'left' | 'right'; // for imageText
+    columns?: 2 | 3 | 4; // for featureCards
   };
 }
 
@@ -238,8 +266,13 @@ export const normalizeProductDetailBlocks = (value: unknown): ProductDetailBlock
   if (value.length > 30) throw new Error('A product can contain at most 30 detail blocks');
   const normalized = value.map((raw: any, index) => {
     const type = String(raw?.type || '') as ProductDetailBlockType;
-    if (!['richText', 'image', 'html', 'divider'].includes(type)) {
-      throw new Error('Product detail block type is not supported');
+    const supportedTypes = [
+      'heading', 'richText', 'image', 'imageText', 'fullWidthImage', 'gallery',
+      'featureCards', 'iconText', 'benefitsList', 'whatsIncluded', 'recommendedAge',
+      'giftBadges', 'divider', 'spacer', 'ctaBanner', 'html'
+    ];
+    if (!supportedTypes.includes(type)) {
+      throw new Error(`Product detail block type '${type}' is not supported`);
     }
     const id = /^[a-zA-Z0-9_-]{1,80}$/.test(String(raw?.id || ''))
       ? String(raw.id)
@@ -247,12 +280,13 @@ export const normalizeProductDetailBlocks = (value: unknown): ProductDetailBlock
     const order = Number(raw?.order ?? index);
     if (!Number.isInteger(order) || order < 0) throw new Error('Product detail block order is invalid');
     const settings = {
-      width: ['full', 'large', 'medium'].includes(raw?.settings?.width)
-        ? raw.settings.width
-        : 'full',
-      alignment: ['left', 'center', 'right'].includes(raw?.settings?.alignment)
-        ? raw.settings.alignment
-        : 'center'
+      width: ['full', 'large', 'medium'].includes(raw?.settings?.width) ? raw.settings.width : 'full',
+      alignment: ['left', 'center', 'right'].includes(raw?.settings?.alignment) ? raw.settings.alignment : 'center',
+      background: raw?.settings?.background ? String(raw.settings.background).slice(0, 50) : undefined,
+      spacing: ['none', 'small', 'medium', 'large'].includes(raw?.settings?.spacing) ? raw.settings.spacing : undefined,
+      responsiveVisibility: ['all', 'desktop', 'mobile'].includes(raw?.settings?.responsiveVisibility) ? raw.settings.responsiveVisibility : 'all',
+      imagePosition: ['left', 'right'].includes(raw?.settings?.imagePosition) ? raw.settings.imagePosition : undefined,
+      columns: [2, 3, 4].includes(Number(raw?.settings?.columns)) ? Number(raw.settings.columns) : undefined
     } as ProductDetailBlock['settings'];
     const block: ProductDetailBlock = {
       id,
@@ -261,29 +295,50 @@ export const normalizeProductDetailBlocks = (value: unknown): ProductDetailBlock
       order,
       settings
     };
-    if (type === 'richText') {
-      block.heading = cleanText(raw?.heading, 140);
-      block.content = sanitizeProductDetailHtml(raw?.content, 20000);
-      if (!block.heading && !block.content) throw new Error('Rich text blocks require a heading or content');
+    block.heading = raw?.heading ? cleanText(raw.heading, 140) : undefined;
+    if (raw?.content) {
+      block.content = sanitizeProductDetailHtml(raw.content, 30000);
     }
-    if (type === 'html') {
-      block.content = sanitizeProductDetailHtml(raw?.content, 30000);
-      if (!block.content) throw new Error('Custom HTML blocks cannot be empty');
+
+    if (Array.isArray(raw?.items)) {
+      block.items = raw.items.map((item: any) => ({
+        icon: item?.icon ? cleanText(item.icon, 50) : undefined,
+        title: item?.title ? cleanText(item.title, 140) : undefined,
+        description: item?.description ? cleanText(item.description, 300) : undefined,
+        content: item?.content ? cleanText(item.content, 300) : undefined
+      }));
     }
-    if (type === 'image') {
-      const secureUrl = String(raw?.image?.secureUrl || '').trim();
-      const publicId = String(raw?.image?.publicId || '').trim();
-      const alt = cleanText(raw?.image?.alt, 180);
-      if (!/^https:\/\/res\.cloudinary\.com\//i.test(secureUrl) || !isProductDetailImagePublicId(publicId)) {
+
+    const validateImage = (imgRaw: any) => {
+      const secureUrl = String(imgRaw?.secureUrl || '').trim();
+      const publicId = String(imgRaw?.publicId || '').trim();
+      const alt = cleanText(imgRaw?.alt, 180);
+      if (secureUrl && (!/^https:\/\/res\.cloudinary\.com\//i.test(secureUrl) || !isProductDetailImagePublicId(publicId))) {
         throw new Error('Image blocks require a valid PlayBimboo Cloudinary image');
       }
-      if (!alt) throw new Error('Image block alt text is required');
-      block.image = {
+      return {
         secureUrl,
         publicId,
-        alt,
-        caption: cleanText(raw?.image?.caption, 300) || undefined
+        alt: alt || 'Product Image',
+        caption: cleanText(imgRaw?.caption, 300) || undefined
       };
+    };
+
+    if (raw?.image?.secureUrl) {
+      block.image = validateImage(raw.image);
+    }
+    if (Array.isArray(raw?.images)) {
+      block.images = raw.images.map(validateImage).filter((img: any) => img.secureUrl);
+    }
+
+    if (type === 'html' && !block.content) {
+      throw new Error('Custom HTML blocks cannot be empty');
+    }
+    if (type === 'richText' && !block.heading && !block.content) {
+      throw new Error('Rich text blocks require a heading or content');
+    }
+    if (type === 'image' && !block.image?.secureUrl) {
+      throw new Error('Image block requires an image');
     }
     return block;
   });

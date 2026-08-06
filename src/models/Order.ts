@@ -6,7 +6,11 @@ export interface IOrderItem {
   price: number;
   quantity: number;
   image: string;
-  selectedVariant?: string;
+  selectedVariant?: string; // Legacy
+  variationId?: string;
+  productType?: 'simple' | 'variable';
+  sku?: string;
+  selectedAttributes?: Record<string, string>;
 }
 
 export interface IShippingAddress {
@@ -68,7 +72,11 @@ const OrderSchema = new Schema<IOrder>(
         price: Number,
         quantity: Number,
         image: String,
-        selectedVariant: String
+        selectedVariant: String, // Legacy
+        variationId: String,
+        productType: { type: String, enum: ['simple', 'variable'] },
+        sku: String,
+        selectedAttributes: { type: Map, of: String }
       }
     ],
     subtotal: { type: Number, required: true },
