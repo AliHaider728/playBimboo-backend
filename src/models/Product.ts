@@ -87,7 +87,7 @@ export interface IProduct extends Document {
   images: string[];
   imagePublicIds: string[];
   shortDescription?: string;
-  description: string;
+  description?: string;
   isVisible: boolean;
   status: 'draft' | 'published';
   isFeatured: boolean;
@@ -208,7 +208,7 @@ const ProductSchema = new Schema<IProduct>(
       }
     },
     shortDescription: { type: String, maxlength: 300 },
-    description: { type: String, required: true },
+    description: { type: String },
     isVisible: { type: Boolean, default: true },
     status: { type: String, enum: ['draft', 'published'], default: 'published' },
     isFeatured: { type: Boolean, default: false },

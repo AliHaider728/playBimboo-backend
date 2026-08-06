@@ -213,7 +213,6 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
   });
 
   if (!name) throw new Error('Product name is required');
-  if (!descriptionText) throw new Error('Detailed description is required');
   if (!slug || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
     throw new Error('URL slug must contain lowercase letters, numbers, and hyphens only');
   }
