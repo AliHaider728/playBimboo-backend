@@ -34,7 +34,11 @@ export interface IProductVariation {
   sku?: string;
   regularPrice: number;
   salePrice?: number;
-  image?: string;
+  image?: {
+    url: string;
+    publicId?: string;
+    alt?: string;
+  };
   manageStock: boolean;
   stockQuantity?: number | null;
   lowStockThreshold?: number | null;
@@ -149,7 +153,11 @@ const ProductSchema = new Schema<IProduct>(
         sku: { type: String, trim: true, uppercase: true },
         regularPrice: { type: Number, required: true, min: 0 },
         salePrice: { type: Number, min: 0 },
-        image: { type: String },
+        image: {
+          url: { type: String },
+          publicId: { type: String },
+          alt: { type: String }
+        },
         manageStock: { type: Boolean, default: false },
         stockQuantity: { type: Number, min: 0 },
         lowStockThreshold: { type: Number, min: 0 },

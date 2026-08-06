@@ -376,7 +376,11 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
           sku: sanitizePlainText(variation.sku, 80).toUpperCase() || undefined,
           regularPrice,
           salePrice,
-          image: typeof variation.image === 'string' ? variation.image.trim() : undefined,
+          image: variation.image?.url ? {
+            url: variation.image.url.trim(),
+            publicId: variation.image.publicId?.trim() || undefined,
+            alt: variation.image.alt?.trim() || undefined
+          } : undefined,
           ...varInventory,
           manageStock: varInventory.trackInventory,
           stockQuantity: varInventory.trackInventory ? varInventory.stockQuantity : null,

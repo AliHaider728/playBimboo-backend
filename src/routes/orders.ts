@@ -253,7 +253,7 @@ router.post('/', async (req: Request, res: Response) => {
           name: product.name,
           price: unitPrice,
           quantity: Number(item.quantity),
-          image: variation.image || product.images?.[0] || '',
+          image: variation.image?.url || product.images?.[0] || '',
           variationId: String(variation.id),
           sku: variation.sku || product.sku,
           selectedAttributes: variation.attributes
