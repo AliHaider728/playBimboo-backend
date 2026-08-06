@@ -12,6 +12,7 @@ const hasValidQuantity = (value: unknown): boolean =>
   value !== undefined &&
   value !== null &&
   value !== '' &&
+  String(value).trim() !== '' &&
   Number.isInteger(Number(value)) &&
   Number(value) >= 0;
 
