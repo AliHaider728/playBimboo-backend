@@ -289,7 +289,19 @@ export const sendOrderStatusEmail = async (order: any) => {
 
 export const getAdminNotificationRecipients = (): string[] => {
   const raw = process.env.NEW_ORDER_NOTIFICATION_EMAILS || '';
-  const emails = raw.split(',').map(e => e.trim()).filter(e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+  let emails = raw.split(',').map(e => e.trim()).filter(e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+  
+  if (emails.length === 0) {
+    const fallbackUser = process.env.SMTP_USER || '';
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fallbackUser)) {
+      emails.push(fallbackUser);
+    } else {
+      const fallbackFromMatch = (process.env.SMTP_FROM || '').match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/i);
+      if (fallbackFromMatch && fallbackFromMatch[0]) {
+        emails.push(fallbackFromMatch[0]);
+      }
+    }
+  }
   return Array.from(new Set(emails));
 };
 
