@@ -424,22 +424,22 @@ export const sendAdminNewOrderEmail = async (order: any, recipients: string[]) =
   return sendEmail(to, buildAdminNewOrderEmail(order));
 };
 
-export const sendPasswordResetEmail = async (user: any, token: string) => {
-  const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`;
+export const sendPasswordResetEmail = async (user: any, code: string) => {
   const subject = 'Reset your PlayBimboo password';
   const html = `
     <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#333;">
       <h2 style="color:#e11d48;">PlayBimboo Password Reset</h2>
       <p>Hello ${escapeHtml(user.name)},</p>
-      <p>You recently requested to reset your password for your PlayBimboo account. Click the button below to reset it.</p>
-      <div style="margin: 30px 0;">
-        <a href="${resetUrl}" style="background-color:#e11d48;color:#fff;padding:12px 24px;text-decoration:none;border-radius:8px;font-weight:bold;">Reset Password</a>
+      <p>You recently requested to reset your password for your PlayBimboo account. Use the 6-digit verification code below to reset it.</p>
+      <div style="margin: 30px 0; text-align: center;">
+        <span style="background-color:#f1f5f9;color:#0f172a;padding:16px 32px;border-radius:12px;font-weight:900;font-size:32px;letter-spacing:4px;">${code}</span>
       </div>
-      <p>If you did not request a password reset, please ignore this email or reply to let us know. This password reset link is only valid for the next 1 hour.</p>
+      <p>This verification code expires in exactly <strong>30 seconds</strong>.</p>
+      <p>If you did not request a password reset, please ignore this email. Your account is safe.</p>
       <p>Thanks,<br>The PlayBimboo Team</p>
     </div>
   `;
-  const text = `Hello ${user.name},\n\nYou recently requested to reset your password for your PlayBimboo account. Please visit the link below to reset it:\n${resetUrl}\n\nIf you did not request this, please ignore this email.\n\nThanks,\nThe PlayBimboo Team`;
+  const text = `Hello ${user.name},\n\nYou recently requested to reset your password. Your 6-digit verification code is:\n\n${code}\n\nThis code expires in 30 seconds.\n\nThanks,\nThe PlayBimboo Team`;
   
   return sendEmail(user.email, { subject, html, text });
 };

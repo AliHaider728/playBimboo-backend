@@ -120,20 +120,19 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
     const user = await User.findOne({ email: email.trim().toLowerCase() });
     if (!user) {
       // Don't leak whether the email exists.
-      return res.json({ message: 'If an account exists, a password reset link has been sent.' });
+      return res.json({ message: 'If an account exists, a 6-digit verification code has been sent.' });
     }
 
-    const { randomBytes } = await import('crypto');
-    const token = randomBytes(20).toString('hex');
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
 
-    user.resetPasswordToken = token;
-    user.resetPasswordExpires = new Date(Date.now() + 3600000); // 1 hour
+    user.resetPasswordToken = code;
+    user.resetPasswordExpires = new Date(Date.now() + 30000); // 30 seconds
     await user.save();
 
     const { sendPasswordResetEmail } = await import('../utils/mailer.js');
-    await sendPasswordResetEmail(user, token);
+    await sendPasswordResetEmail(user, code);
 
-    res.json({ message: 'If an account exists, a password reset link has been sent.' });
+    res.json({ message: 'If an account exists, a 6-digit verification code has been sent.' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

@@ -19,6 +19,7 @@ export interface ISettings extends Document {
   defaultMetaDescription: string;
   storefrontNavigation: StorefrontNavigationItem[];
   homepageSections: HomepageSectionSetting[];
+  socialLinks?: { instagram?: string; facebook?: string; youtube?: string; tiktok?: string; };
 }
 
 const StorefrontNavigationSchema = new Schema<StorefrontNavigationItem>({
@@ -56,9 +57,9 @@ const HomepageSectionSchema = new Schema<HomepageSectionSetting>({
 const SettingsSchema = new Schema<ISettings>(
   {
     storeName: { type: String, default: 'PlayBimboo' },
-    email: { type: String, default: 'sales@playbimboo.com' },
-    phone: { type: String, default: '+327-6655557' },
-    address: { type: String, default: 'Mumtaz Market, Shafique Center, Gujranwala, Pakistan' },
+    email: { type: String, default: 'Sales@playbimboo.com' },
+    phone: { type: String, default: '0310-7172222' },
+    address: { type: String, default: 'Mumtaz Market, Gujranwala' },
     currency: { type: String, default: 'Rs.' },
     freeShippingThreshold: { type: Number, default: 3000 },
     standardShippingFee: { type: Number, default: 200 },
@@ -72,6 +73,10 @@ const SettingsSchema = new Schema<ISettings>(
     homepageSections: {
       type: [HomepageSectionSchema],
       default: () => DEFAULT_HOMEPAGE_SECTIONS.map(item => ({ ...item }))
+    },
+    socialLinks: {
+      type: { instagram: String, facebook: String, youtube: String, tiktok: String },
+      default: { instagram: 'https://www.instagram.com/playbimbootoys', facebook: 'https://facebook.com/playbimbootoys', youtube: 'https://youtube.com/@playbimboo', tiktok: 'https://tiktok.com/@playbimbootoys' }
     }
   },
   { timestamps: true }
