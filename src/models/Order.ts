@@ -63,7 +63,7 @@ const OrderSchema = new Schema<IOrder>(
   {
     orderId: { type: String, required: true, unique: true },
     customerName: { type: String, required: true },
-    email: { type: String, required: true },
+    email: { type: String, trim: true, default: '' },
     phone: { type: String, required: true },
     items: [
       {

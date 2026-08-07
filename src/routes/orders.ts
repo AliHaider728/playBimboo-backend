@@ -22,6 +22,7 @@ const logEmailFailure = (kind: string, orderId: string, error: unknown) => {
 
 const sendAndTrackOrderConfirmation = async (order: any) => {
   if (order.confirmationEmailSentAt) return;
+  if (!String(order.email || '').trim()) return;
   try {
     const confirmation = await sendOrderConfirmationEmail(order);
     order.confirmationEmailSentAt = new Date();
@@ -181,7 +182,7 @@ router.get('/:orderId', authenticateToken, async (req: AuthRequest, res: Respons
 
     const canViewOrder =
       ['admin', 'super_admin'].includes(req.user?.role || '') ||
-      order.email.toLowerCase() === req.user?.email.toLowerCase();
+      (Boolean(order.email) && order.email.toLowerCase() === req.user?.email.toLowerCase());
     if (!canViewOrder) {
       return res.status(403).json({ error: 'Access denied' });
     }
@@ -351,7 +352,7 @@ router.post('/', async (req: Request, res: Response) => {
     const newOrder = new Order({
       orderId,
       customerName,
-      email,
+      email: typeof email === 'string' ? email.trim().toLowerCase() : '',
       phone,
       items: canonicalItems,
       subtotal: computedSubtotal,
@@ -426,9 +427,11 @@ router.post('/:orderId/cancel', async (req: Request, res: Response) => {
       }
     }
 
-    void sendOrderStatusEmail(order).catch(error =>
-      logEmailFailure('Order status', order.orderId, error)
-    );
+    if (order.email) {
+      void sendOrderStatusEmail(order).catch(error =>
+        logEmailFailure('Order status', order.orderId, error)
+      );
+    }
 
     res.json({ message: 'Order successfully cancelled within 24h window', order });
   } catch (err: any) {
@@ -490,7 +493,9 @@ router.put('/:orderId/status', authenticateToken, requireAdmin, async (req: Requ
       order.deliveredAt = new Date();
       await order.save();
 
-      if (!order.deliveredEmailSentAt) {
+      if (!order.email) {
+        notification.emailStatus = 'not_applicable';
+      } else if (!order.deliveredEmailSentAt) {
         try {
           const delivery = await sendOrderDeliveredEmail(order);
           order.deliveredEmailSentAt = new Date();
@@ -511,7 +516,7 @@ router.put('/:orderId/status', authenticateToken, requireAdmin, async (req: Requ
       } else {
         notification.emailStatus = 'already_sent';
       }
-    } else if (statusChanged) {
+    } else if (statusChanged && order.email) {
       void sendOrderStatusEmail(order).catch(error =>
         logEmailFailure('Order status', order.orderId, error)
       );
