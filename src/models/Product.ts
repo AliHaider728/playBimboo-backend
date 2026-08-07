@@ -70,6 +70,7 @@ export interface IProduct extends Document {
   attributes?: IProductAttribute[];
   variations?: IProductVariation[];
   defaultAttributes?: Record<string, string>;
+  defaultVariationId?: string;
   name: string;
   slug: string;
   sku?: string;
@@ -172,6 +173,7 @@ const ProductSchema = new Schema<IProduct>(
       }
     ],
     defaultAttributes: { type: Map, of: String },
+    defaultVariationId: { type: String, trim: true },
     name: { type: String, required: true },
     slug: { type: String, required: true, unique: true },
     sku: { type: String, trim: true, uppercase: true, unique: true, sparse: true },

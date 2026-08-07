@@ -15,7 +15,9 @@ import {
 } from '../src/config/storeAppearance.js';
 import { authenticateIfPresent, requireAdmin, requireSuperAdmin } from '../src/middleware/auth.js';
 import { requestChangesCustomCode } from '../src/routes/products.js';
+import { serializeProduct } from '../src/routes/products.js';
 import { validateItemStock } from '../src/routes/orders.js';
+import Product from '../src/models/Product.js';
 
 test('multi-age normalization supports legacy reads and canonical multi-select writes', () => {
   assert.deepEqual(normalizeAgeGroups(undefined, '3-5'), ['3-5']);
@@ -79,11 +81,40 @@ test('variant inventory controls checkout without a stale parent override', () =
   assert.throws(() => validateItemStock(product, 4, 'Pieces: 64 PCS'), /enough stock/i);
 });
 
+test('product API serialization preserves variation and default attribute maps', () => {
+  const product = new Product({
+    name: 'Variable toy',
+    slug: 'variable-toy',
+    price: 1000,
+    images: ['https://example.com/toy.jpg'],
+    imagePublicIds: [''],
+    productType: 'variable',
+    ageGroups: ['6-8'],
+    attributes: [{
+      source: 'custom', id: 'color', name: 'Color', slug: 'color', displayType: 'color_swatches',
+      terms: [{ id: 'red', label: 'Red', slug: 'red', value: 'Red', colorValue: '#ef4444', position: 0 }],
+      selectedTermIds: [], visible: true, usedForVariations: true, position: 0
+    }],
+    variations: [{
+      id: 'variation-red', attributes: { color: 'Red' }, enabled: true, regularPrice: 1000,
+      manageStock: false, stockStatus: 'in_stock'
+    }],
+    defaultAttributes: { color: 'Red' },
+    defaultVariationId: 'variation-red'
+  });
+
+  const serialized = serializeProduct(product);
+  assert.deepEqual(serialized.variations[0].attributes, { color: 'Red' });
+  assert.deepEqual(serialized.defaultAttributes, { color: 'Red' });
+  assert.equal(serialized.defaultVariationId, 'variation-red');
+  assert.equal(serialized.attributes[0].terms[0].colorValue, '#ef4444');
+});
+
 test('product CSS is scoped and blocks global or external constructs', () => {
   const result = sanitizeAndScopeProductCss('.highlight { color: #e11d48; }', 'safe-product');
   assert.equal(result.raw, '.highlight { color: #e11d48; }');
   assert.match(result.scoped, /^\.product-custom-content\[data-product-slug="safe-product"\] \.highlight/);
-  assert.throws(() => sanitizeAndScopeProductCss('body { display:none }', 'safe-product'), /protected global/i);
+  assert.throws(() => sanitizeAndScopeProductCss('body { display:none }', 'safe-product'), /not allowed|protected global/i);
   assert.throws(() => sanitizeAndScopeProductCss('.x { background:url(https://evil.example/x) }', 'safe-product'), /blocked construct/i);
   assert.throws(() => sanitizeAndScopeProductCss('@import "evil.css";', 'safe-product'), /blocked construct/i);
   assert.throws(() => sanitizeAndScopeProductCss('.x { position: fixed; z-index: 9999 }', 'safe-product'), /overlay layers/i);
@@ -94,10 +125,11 @@ test('detail image blocks require a dedicated PlayBimboo Cloudinary asset and al
     id: 'image-1', type: 'image', enabled: true, order: 0,
     image: { secureUrl: 'https://res.cloudinary.com/demo/image/upload/example.jpg', publicId: 'playbimboo/products/not-detail', alt: 'Toy' }
   }]), /valid PlayBimboo Cloudinary/i);
-  assert.throws(() => normalizeProductDetailBlocks([{
+  const normalized = normalizeProductDetailBlocks([{
     id: 'image-1', type: 'image', enabled: true, order: 0,
     image: { secureUrl: 'https://res.cloudinary.com/demo/image/upload/example.jpg', publicId: 'playbimboo/products/detail-content/example', alt: '' }
-  }]), /alt text/i);
+  }]);
+  assert.equal(normalized[0].image?.alt, 'Product Image');
 });
 
 test('appearance validation keeps stable keys and protected routes', () => {

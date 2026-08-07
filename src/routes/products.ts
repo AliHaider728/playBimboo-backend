@@ -77,8 +77,12 @@ const safelyNormalizeAgeGroups = (product: Record<string, any>) => {
   }
 };
 
-const serializeProduct = (value: any, reviewSummary?: ReviewSummary) => {
-  const product = typeof value?.toObject === 'function' ? value.toObject() : { ...value };
+export const serializeProduct = (value: any, reviewSummary?: ReviewSummary) => {
+  // Mongoose Map values stringify as `{}` after a default `toObject()` call.
+  // Flatten them here so variation/default attribute values survive every API read.
+  const product = typeof value?.toObject === 'function'
+    ? value.toObject({ flattenMaps: true })
+    : { ...value };
   product.ageGroups = safelyNormalizeAgeGroups(product);
   delete product.ageGroup;
   try {
@@ -119,7 +123,9 @@ const serializeProduct = (value: any, reviewSummary?: ReviewSummary) => {
 };
 
 const serializeProducts = async (values: any[]) => {
-  const plainValues = values.map(value => typeof value?.toObject === 'function' ? value.toObject() : { ...value });
+  const plainValues = values.map(value => typeof value?.toObject === 'function'
+    ? value.toObject({ flattenMaps: true })
+    : { ...value });
   const summaries = await getApprovedReviewSummaries(plainValues);
   return values.map((value, index) => {
     const key = String(plainValues[index]._id || plainValues[index].id || '');
@@ -358,7 +364,10 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
 
         const attrMap: Record<string, string> = {};
         if (variation.attributes && typeof variation.attributes === 'object') {
-          for (const [k, v] of Object.entries(variation.attributes)) {
+          const variationAttributeEntries: Array<[string, unknown]> = variation.attributes instanceof Map
+            ? Array.from(variation.attributes.entries()) as Array<[string, unknown]>
+            : Object.entries(variation.attributes);
+          for (const [k, v] of variationAttributeEntries) {
             attrMap[sanitizePlainText(k, 80)] = sanitizePlainText(v, 80);
           }
         }
@@ -393,9 +402,32 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
 
   const defaultAttributes: Record<string, string> = {};
   if (merged.defaultAttributes && typeof merged.defaultAttributes === 'object') {
-    for (const [k, v] of Object.entries(merged.defaultAttributes)) {
+    const defaultAttributeEntries: Array<[string, unknown]> = merged.defaultAttributes instanceof Map
+      ? Array.from(merged.defaultAttributes.entries()) as Array<[string, unknown]>
+      : Object.entries(merged.defaultAttributes);
+    for (const [k, v] of defaultAttributeEntries) {
       defaultAttributes[sanitizePlainText(k, 80)] = sanitizePlainText(v, 80);
     }
+  }
+
+  let defaultVariationId = sanitizePlainText(merged.defaultVariationId, 80) || undefined;
+  let defaultVariation = defaultVariationId
+    ? variations.find((variation: any) => variation.enabled && variation.id === defaultVariationId)
+    : undefined;
+  if (!defaultVariation && Object.keys(defaultAttributes).length > 0) {
+    defaultVariation = variations.find((variation: any) =>
+      variation.enabled && Object.entries(defaultAttributes).every(
+        ([key, value]) => variation.attributes[key] === value
+      )
+    );
+  }
+  if (defaultVariation) {
+    defaultVariationId = defaultVariation.id;
+    Object.keys(defaultAttributes).forEach(key => delete defaultAttributes[key]);
+    Object.assign(defaultAttributes, defaultVariation.attributes);
+  } else if (productType !== 'variable') {
+    defaultVariationId = undefined;
+    Object.keys(defaultAttributes).forEach(key => delete defaultAttributes[key]);
   }
 
   const sku = sanitizePlainText(merged.sku, 80).toUpperCase() || undefined;
@@ -441,6 +473,7 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
     attributes,
     variations,
     defaultAttributes,
+    defaultVariationId,
     features: Array.isArray(merged.features)
       ? merged.features.map((feature: unknown) => sanitizePlainText(feature, 160)).filter(Boolean)
       : [],
