@@ -82,6 +82,9 @@ export interface IProduct extends Document {
   category?: string;
   categorySlug?: string;
   categoryId?: string;
+  categoryIds: string[];
+  categoryNames: string[];
+  categorySlugs: string[];
   ageGroup?: string;
   ageGroups: SupportedAgeGroup[];
   brand: string;
@@ -98,6 +101,9 @@ export interface IProduct extends Document {
   isVisible: boolean;
   status: 'draft' | 'published';
   isFeatured: boolean;
+  isBestseller: boolean;
+  isNewArrival: boolean;
+  isSpotlight: boolean;
   lowStockThreshold?: number | null;
   weight?: number;
   deliveryType?: 'store_threshold' | 'category' | 'fixed' | 'free' | 'none';
@@ -187,6 +193,11 @@ const ProductSchema = new Schema<IProduct>(
     category: { type: String, default: '' },
     categorySlug: { type: String, default: '' },
     categoryId: { type: String, default: '' },
+    // Ordered multi-category fields are canonical. The single-value fields above
+    // remain as the primary category for old clients, URLs and legacy documents.
+    categoryIds: { type: [{ type: String }], default: undefined },
+    categoryNames: { type: [{ type: String }], default: undefined },
+    categorySlugs: { type: [{ type: String }], default: undefined },
     // ageGroup remains readable for old production documents while ageGroups is
     // the canonical field for all new writes.
     ageGroup: { type: String },
@@ -240,6 +251,9 @@ const ProductSchema = new Schema<IProduct>(
     isVisible: { type: Boolean, default: true },
     status: { type: String, enum: ['draft', 'published'], default: 'published' },
     isFeatured: { type: Boolean, default: false },
+    isBestseller: { type: Boolean, default: false },
+    isNewArrival: { type: Boolean, default: false },
+    isSpotlight: { type: Boolean, default: false },
     weight: { type: Number, min: 0 },
     deliveryType: { type: String, enum: ['store_threshold', 'category', 'fixed', 'free', 'none'], default: 'store_threshold' },
     customDeliveryFee: { type: Number, min: 0 },
@@ -306,6 +320,13 @@ const ProductSchema = new Schema<IProduct>(
     sizeGuide: { type: String }
   },
   { timestamps: true }
+);
+
+// A partial unique index makes the single homepage slot race-safe. Products
+// which are not the spotlight are excluded from the index.
+ProductSchema.index(
+  { isSpotlight: 1 },
+  { unique: true, partialFilterExpression: { isSpotlight: true } }
 );
 
 export default mongoose.model<IProduct>('Product', ProductSchema);

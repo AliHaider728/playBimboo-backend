@@ -10,6 +10,7 @@
     "dev": "tsx src/local.ts",
     "build": "tsc",
     "backfill:product-thumbnails": "tsx src/scripts/backfillProductThumbnails.ts",
+    "migrate:product-merchandising": "tsx src/scripts/migrateProductMerchandising.ts",
     "test": "tsx --test tests/*.test.ts",
     "start": "node dist/local.js"
   },

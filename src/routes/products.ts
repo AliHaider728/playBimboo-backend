@@ -117,6 +117,15 @@ export const serializeProduct = (value: any, reviewSummary?: ReviewSummary) => {
   product.category = typeof product.category === 'string' ? product.category : '';
   product.categorySlug = typeof product.categorySlug === 'string' ? product.categorySlug : '';
   product.categoryId = typeof product.categoryId === 'string' ? product.categoryId : '';
+  product.categoryIds = Array.isArray(product.categoryIds) && product.categoryIds.length > 0
+    ? [...new Set(product.categoryIds.filter((value: unknown): value is string => typeof value === 'string' && value.length > 0))]
+    : product.categoryId ? [product.categoryId] : [];
+  product.categoryNames = Array.isArray(product.categoryNames) && product.categoryNames.length > 0
+    ? [...new Set(product.categoryNames.filter((value: unknown): value is string => typeof value === 'string' && value.length > 0))]
+    : product.category ? [product.category] : [];
+  product.categorySlugs = Array.isArray(product.categorySlugs) && product.categorySlugs.length > 0
+    ? [...new Set(product.categorySlugs.filter((value: unknown): value is string => typeof value === 'string' && value.length > 0))]
+    : product.categorySlug ? [product.categorySlug] : [];
   product.rating = reviewSummary?.rating ?? 0;
   product.reviewCount = reviewSummary?.reviewCount ?? 0;
   return product;
@@ -194,6 +203,11 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
   const category = sanitizePlainText(merged.category, 120);
   const categorySlug = category ? createSlug(merged.categorySlug || category) : '';
   const categoryId = sanitizePlainText(merged.categoryId, 80);
+  const categoryIds = [...new Set(
+    (Array.isArray(merged.categoryIds) ? merged.categoryIds : categoryId ? [categoryId] : [])
+      .map((value: unknown) => sanitizePlainText(value, 80))
+      .filter(Boolean)
+  )];
   const slug = createSlug(merged.slug || name);
   const ageGroups = normalizeAgeGroups(merged.ageGroups, merged.ageGroup);
   const productDetailBlocks = normalizeProductDetailBlocks(merged.productDetailBlocks);
@@ -502,7 +516,14 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
     reviewCount: Number.isFinite(Number(current?.reviewCount)) ? Number(current?.reviewCount) : 0,
     category,
     categorySlug,
-    categoryId: category ? categoryId : '',
+    categoryId: categoryIds[0] || (category ? categoryId : ''),
+    categoryIds,
+    categoryNames: Array.isArray(merged.categoryNames)
+      ? merged.categoryNames.map((value: unknown) => sanitizePlainText(value, 120)).filter(Boolean)
+      : category ? [category] : [],
+    categorySlugs: Array.isArray(merged.categorySlugs)
+      ? merged.categorySlugs.map((value: unknown) => createSlug(value)).filter(Boolean)
+      : categorySlug ? [categorySlug] : [],
     ageGroups,
     brand: sanitizePlainText(merged.brand, 100) || 'PlayBimboo',
     ...inventory,
@@ -517,6 +538,9 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
     isVisible: merged.isVisible !== false,
     status,
     isFeatured: merged.isFeatured === true,
+    isBestseller: merged.isBestseller === true,
+    isNewArrival: merged.isNewArrival === true,
+    isSpotlight: merged.isSpotlight === true,
     weight,
     deliveryType,
     customDeliveryFee: deliveryType === 'fixed' ? customDeliveryFee : undefined,
@@ -549,10 +573,32 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
 };
 
 const resolveCategoryReference = async (payload: ReturnType<typeof normalizeProductPayload>) => {
-  if (!payload.categoryId) return payload;
-  const category = await Category.findOne({ _id: payload.categoryId, isActive: { $ne: false } });
-  if (!category) throw new Error('Selected category is unavailable');
-  return { ...payload, category: category.name, categorySlug: category.slug, categoryId: category.id };
+  if (payload.categoryIds.length === 0) {
+    return {
+      ...payload,
+      categoryIds: [],
+      categoryNames: payload.category ? [payload.category] : [],
+      categorySlugs: payload.categorySlug ? [payload.categorySlug] : []
+    };
+  }
+  const categories = await Category.find({
+    _id: { $in: payload.categoryIds },
+    isActive: { $ne: false }
+  });
+  const byId = new Map(categories.map(category => [category.id, category]));
+  const ordered = payload.categoryIds.map(id => byId.get(id));
+  if (ordered.some(category => !category)) throw new Error('One or more selected categories are unavailable');
+  const resolved = ordered.filter((category): category is NonNullable<typeof category> => Boolean(category));
+  const primary = resolved[0]!;
+  return {
+    ...payload,
+    category: primary.name,
+    categorySlug: primary.slug,
+    categoryId: primary.id,
+    categoryIds: resolved.map(category => category.id),
+    categoryNames: resolved.map(category => category.name),
+    categorySlugs: resolved.map(category => category.slug)
+  };
 };
 
 const assertUniqueIdentifiers = async (
@@ -595,7 +641,10 @@ router.get('/', authenticateIfPresent, async (req: AuthRequest, res: Response) =
     }
 
     if (category && category !== 'all') {
-      filter.categorySlug = category;
+      filter.$and = [
+        ...(filter.$and || []),
+        { $or: [{ categorySlugs: category }, { categorySlug: category }] }
+      ];
     }
     if (ageGroup && ageGroup !== 'all') {
       if (!SUPPORTED_AGE_GROUPS.includes(ageGroup as any)) {
@@ -651,7 +700,7 @@ router.get('/export/csv', authenticateToken, requireAdmin, async (_req: Request,
       ...serializeProduct(product),
       ageGroups: safelyNormalizeAgeGroups(product).join('|')
     }));
-    const fields = ['_id', 'name', 'slug', 'price', 'originalPrice', 'category', 'categorySlug', 'ageGroups', 'brand', 'stockQuantity', 'isVisible', 'deliveryType', 'description'];
+    const fields = ['_id', 'name', 'slug', 'price', 'originalPrice', 'category', 'categorySlug', 'categoryIds', 'categoryNames', 'categorySlugs', 'ageGroups', 'brand', 'stockQuantity', 'isVisible', 'isFeatured', 'isBestseller', 'isNewArrival', 'isSpotlight', 'deliveryType', 'description'];
     const json2csvParser = new Parser({ fields });
     const csv = json2csvParser.parse(exportProducts);
 
@@ -686,6 +735,7 @@ router.post('/import/csv', authenticateToken, requireAdmin, upload.single('file'
         originalPrice: item.originalPrice ? Number(item.originalPrice) : undefined,
         category: item.category || '',
         categorySlug: item.categorySlug || '',
+        categoryIds: (item.categoryIds || '').split(/[|,]/).map(value => value.trim()).filter(Boolean),
         ageGroups,
         brand: item.brand || 'PlayBimboo',
         trackInventory: item.trackInventory === 'true' || Boolean(item.stockQuantity?.trim()),
@@ -693,6 +743,10 @@ router.post('/import/csv', authenticateToken, requireAdmin, upload.single('file'
         stockStatus: item.stockStatus || (item.inStock === 'false' ? 'out_of_stock' : 'in_stock'),
         description: item.description || 'Quality toy for kids.',
         isVisible: item.isVisible !== 'false',
+        isFeatured: item.isFeatured === 'true',
+        isBestseller: item.isBestseller === 'true',
+        isNewArrival: item.isNewArrival === 'true',
+        isSpotlight: item.isSpotlight === 'true',
         images: item.images
           ? item.images.split(',').map(value => value.trim()).filter(Boolean)
           : existing?.images || ['https://images.unsplash.com/photo-1587654780291-39c9404d746b?auto=format&fit=crop&w=600&q=80']
@@ -746,6 +800,7 @@ router.post('/', authenticateToken, requireAdmin, async (req: AuthRequest, res: 
     const payload = await resolveCategoryReference(normalizeProductPayload(req.body));
     payload.attributes = await syncProductGlobalAttributes(payload.attributes);
     await assertUniqueIdentifiers(payload);
+    if (payload.isSpotlight) await Product.updateMany({ isSpotlight: true }, { $set: { isSpotlight: false } });
     const newProduct = new Product(payload);
     await newProduct.save();
     res.status(201).json((await serializeProducts([newProduct]))[0]);
@@ -777,6 +832,9 @@ router.put('/:id', authenticateToken, requireAdmin, async (req: AuthRequest, res
       return res.status(503).json({
         error: 'Cannot replace or remove product images because Cloudinary is not configured.'
       });
+    }
+    if (payload.isSpotlight) {
+      await Product.updateMany({ _id: { $ne: product.id }, isSpotlight: true }, { $set: { isSpotlight: false } });
     }
     product.set(payload);
     product.set('ageGroup', undefined);

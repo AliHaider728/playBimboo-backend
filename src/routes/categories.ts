@@ -65,7 +65,45 @@ const normalizeCategoryPayload = (body: Record<string, any>, current?: Record<st
 };
 
 const categoryProductFilter = (category: Record<string, any>) => ({
-  $or: [{ categoryId: String(category._id) }, { categorySlug: category.slug }]
+  $or: [
+    { categoryIds: String(category._id) },
+    { categorySlugs: category.slug },
+    { categoryId: String(category._id) },
+    { categorySlug: category.slug }
+  ]
+});
+
+const readProductCategories = (
+  product: Record<string, any>,
+  legacyFallback?: { id: string; name: string; slug: string }
+) => {
+  const ids = Array.isArray(product.categoryIds) && product.categoryIds.length > 0
+    ? product.categoryIds.map(String)
+    : product.categoryId ? [String(product.categoryId)] : [];
+  const names = Array.isArray(product.categoryNames) ? product.categoryNames : [];
+  const slugs = Array.isArray(product.categorySlugs) ? product.categorySlugs : [];
+  const resolved = ids.map((id, index) => ({
+    id,
+    name: String(names[index] || (index === 0 ? product.category : '') || ''),
+    slug: String(slugs[index] || (index === 0 ? product.categorySlug : '') || '')
+  }));
+  if (resolved.length === 0 && legacyFallback && (product.category || product.categorySlug)) {
+    resolved.push({
+      id: legacyFallback.id,
+      name: String(product.category || legacyFallback.name),
+      slug: String(product.categorySlug || legacyFallback.slug)
+    });
+  }
+  return resolved;
+};
+
+const categoryFields = (categories: Array<{ id: string; name: string; slug: string }>) => ({
+  categoryIds: categories.map(category => category.id),
+  categoryNames: categories.map(category => category.name),
+  categorySlugs: categories.map(category => category.slug),
+  categoryId: categories[0]?.id || '',
+  category: categories[0]?.name || '',
+  categorySlug: categories[0]?.slug || ''
 });
 
 const serializeCategories = async (categories: any[]) => Promise.all(categories.map(async category => {
@@ -157,9 +195,22 @@ router.put('/:id', authenticateToken, requireSuperAdmin, async (req: Request, re
     const oldSlug = category.slug;
     category.set(payload);
     await category.save();
-    await Product.updateMany(categoryProductFilter({ _id: category.id, slug: oldSlug }), {
-      $set: { categoryId: category.id, category: category.name, categorySlug: category.slug }
-    });
+    const affectedProducts = await Product.find(categoryProductFilter({ _id: category.id, slug: oldSlug }))
+      .select('categoryId category categorySlug categoryIds categoryNames categorySlugs').lean();
+    if (affectedProducts.length > 0) {
+      await Product.bulkWrite(affectedProducts.map(product => ({
+        updateOne: {
+          filter: { _id: product._id },
+          update: { $set: categoryFields(readProductCategories(product, {
+            id: category.id,
+            name: category.name,
+            slug: oldSlug
+          }).map(item =>
+            item.id === category.id ? { id: category.id, name: category.name, slug: category.slug } : item
+          )) }
+        }
+      })));
+    }
     if (oldPublicId && oldPublicId !== category.imagePublicId) await deleteUnusedCategoryImage(oldPublicId);
     res.json((await serializeCategories([category]))[0]);
   } catch (error: any) {
@@ -197,11 +248,26 @@ router.delete('/:id', authenticateToken, requireSuperAdmin, async (req: Request,
         if (!target) throw new Error('Reassignment category was not found');
       }
       if (productCount > 0) {
-        const replacement = resolution === 'reassign'
-          ? { categoryId: target.id, category: target.name, categorySlug: target.slug }
-          : { categoryId: '', category: '', categorySlug: '' };
-        const update = await Product.updateMany(productFilter, { $set: replacement }, { session });
-        result.productsReassigned = update.modifiedCount;
+        const affectedProducts = await Product.find(productFilter)
+          .select('categoryId category categorySlug categoryIds categoryNames categorySlugs')
+          .session(session).lean();
+        const operations = affectedProducts.map(product => {
+          const currentCategories = readProductCategories(product, {
+            id: category.id,
+            name: category.name,
+            slug: category.slug
+          });
+          const nextCategories: Array<{ id: string; name: string; slug: string }> = [];
+          for (const item of currentCategories) {
+            const next = item.id === category.id
+              ? resolution === 'reassign' ? { id: target.id, name: target.name, slug: target.slug } : undefined
+              : item;
+            if (next && !nextCategories.some(existing => existing.id === next.id)) nextCategories.push(next);
+          }
+          return { updateOne: { filter: { _id: product._id }, update: { $set: categoryFields(nextCategories) } } };
+        });
+        if (operations.length > 0) await Product.bulkWrite(operations, { session });
+        result.productsReassigned = operations.length;
       }
       if (settings && affectedNav.length > 0) {
         if (navigationResolution === 'reassign') {

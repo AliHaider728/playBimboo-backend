@@ -110,6 +110,40 @@ test('product API serialization preserves variation and default attribute maps',
   assert.equal(serialized.attributes[0].terms[0].colorValue, '#ef4444');
 });
 
+test('product API serialization provides backward-compatible multi-category data', () => {
+  const legacy = serializeProduct({
+    _id: 'legacy-product',
+    name: 'Legacy toy',
+    category: 'STEM Toys',
+    categorySlug: 'stem-toys',
+    categoryId: 'category-1',
+    ageGroup: '3-5'
+  });
+  assert.deepEqual(legacy.categoryIds, ['category-1']);
+  assert.deepEqual(legacy.categoryNames, ['STEM Toys']);
+  assert.deepEqual(legacy.categorySlugs, ['stem-toys']);
+  assert.deepEqual(legacy.ageGroups, ['3-5']);
+
+  const canonical = serializeProduct({
+    _id: 'multi-product',
+    category: 'STEM Toys',
+    categorySlug: 'stem-toys',
+    categoryId: 'category-1',
+    categoryIds: ['category-1', 'category-2'],
+    categoryNames: ['STEM Toys', 'Building Toys'],
+    categorySlugs: ['stem-toys', 'building-toys'],
+    ageGroups: ['3-5', '6-8'],
+    isFeatured: true,
+    isNewArrival: true,
+    isSpotlight: true
+  });
+  assert.deepEqual(canonical.categoryIds, ['category-1', 'category-2']);
+  assert.deepEqual(canonical.categorySlugs, ['stem-toys', 'building-toys']);
+  assert.equal(canonical.isFeatured, true);
+  assert.equal(canonical.isNewArrival, true);
+  assert.equal(canonical.isSpotlight, true);
+});
+
 test('product CSS is scoped and blocks global or external constructs', () => {
   const result = sanitizeAndScopeProductCss('.highlight { color: #e11d48; }', 'safe-product');
   assert.equal(result.raw, '.highlight { color: #e11d48; }');
