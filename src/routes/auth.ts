@@ -6,6 +6,30 @@ import { authenticateToken, requireAdmin, AuthRequest } from '../middleware/auth
 
 const router = Router();
 
+// POST /api/auth/register (Public customer self-registration — always role=customer)
+router.post('/register', async (req: Request, res: Response) => {
+  try {
+    const { name, email, password } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: 'Name, email, and password are required' });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+    const normalizedEmail = email.trim().toLowerCase();
+    const existing = await User.findOne({ email: normalizedEmail });
+    if (existing) {
+      return res.status(409).json({ error: 'An account with this email already exists' });
+    }
+    const passwordHash = await bcrypt.hash(password, 10);
+    // Always customer — never allow frontend to set role
+    await User.create({ name: name.trim(), email: normalizedEmail, passwordHash, role: 'customer' });
+    res.status(201).json({ message: 'Account created successfully. Please sign in to continue.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/auth/login (Admin & Customer Login)
 router.post('/login', async (req: Request, res: Response) => {
   try {
