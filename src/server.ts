@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express, { Request, Response, NextFunction } from 'express';
 import cors, { CorsOptions } from 'cors';
 import { connectToDatabase } from './lib/database.js';
+import { migrateSettings } from './lib/migrateSettings.js';
 import categoryRoutes from './routes/categories.js';
 import productRoutes from './routes/products.js';
 import orderRoutes from './routes/orders.js';
@@ -55,6 +56,8 @@ const requireDatabaseConnection = async (
 app.get('/api/health', async (_req: Request, res: Response) => {
   try {
     const mongoose = await connectToDatabase();
+    // Run migration once per boot when DB is reachable
+    void migrateSettings();
     res.json({
       status: 'ok',
       dbConnected: mongoose.connection.readyState === 1

@@ -89,7 +89,13 @@ const toPublicSettings = async (settings: any) => ({
   metaTitle: settings.defaultMetaTitle,
   metaDescription: settings.defaultMetaDescription,
   storefrontNavigation: await resolvePublicNavigation(settings),
-  homepageSections: normalizeStoredHomepageSections(settings.homepageSections)
+  homepageSections: normalizeStoredHomepageSections(settings.homepageSections),
+  socialLinks: {
+    instagram: settings.socialLinks?.instagram || 'https://www.instagram.com/playbimbootoys',
+    facebook: settings.socialLinks?.facebook || 'https://facebook.com/playbimbootoys',
+    youtube: settings.socialLinks?.youtube || 'https://youtube.com/@playbimboo',
+    tiktok: settings.socialLinks?.tiktok || 'https://tiktok.com/@playbimbootoys'
+  }
 });
 
 // GET safe storefront settings (Public)
