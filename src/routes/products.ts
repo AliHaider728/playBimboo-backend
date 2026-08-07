@@ -786,18 +786,39 @@ router.get('/:idOrSlug/related', authenticateIfPresent, async (req: AuthRequest,
     const currentCategoryIds = product.categoryIds?.length ? product.categoryIds : product.categoryId ? [product.categoryId] : [];
     const currentAgeGroups = product.ageGroups?.length ? product.ageGroups : [];
 
-    const related = await Product.find({
-      _id: { $ne: product._id },
-      isVisible: { $ne: false },
-      status: { $ne: 'draft' },
-      $or: [
-        { categoryIds: { $in: currentCategoryIds } },
-        { categoryId: { $in: currentCategoryIds } },
-        { ageGroups: { $in: currentAgeGroups } }
-      ]
-    }).limit(4);
+      let related: any[] = [];
+      
+      const orConditions = [];
+      if (currentCategoryIds.length > 0) {
+        orConditions.push({ categoryIds: { $in: currentCategoryIds } });
+        orConditions.push({ categoryId: { $in: currentCategoryIds } });
+      }
+      if (currentAgeGroups.length > 0) {
+        orConditions.push({ ageGroups: { $in: currentAgeGroups } });
+      }
 
-    res.json(await serializeProducts(related));
+      if (orConditions.length > 0) {
+        related = await Product.find({
+          _id: { $ne: product._id },
+          isVisible: { $ne: false },
+          status: { $ne: 'draft' },
+          $or: orConditions
+        }).limit(4);
+      }
+
+      // Fallback: Fill remaining spots with other active products
+      if (related.length < 4) {
+        const excludeIds = [product._id, ...related.map(r => r._id)];
+        const fallback = await Product.find({
+          _id: { $nin: excludeIds },
+          isVisible: { $ne: false },
+          status: { $ne: 'draft' }
+        }).limit(4 - related.length);
+        
+        related = [...related, ...fallback];
+      }
+
+      res.json(await serializeProducts(related));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

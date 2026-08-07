@@ -56,9 +56,9 @@ const HomepageSectionSchema = new Schema<HomepageSectionSetting>({
 const SettingsSchema = new Schema<ISettings>(
   {
     storeName: { type: String, default: 'PlayBimboo' },
-    email: { type: String, default: 'support@playbimboo.com' },
-    phone: { type: String, default: '+92 300 1234567' },
-    address: { type: String, default: 'Gulberg III, Lahore, Pakistan' },
+    email: { type: String, default: 'sales@playbimboo.com' },
+    phone: { type: String, default: '+327-6655557' },
+    address: { type: String, default: 'Mumtaz Market, Shafique Center, Gujranwala, Pakistan' },
     currency: { type: String, default: 'Rs.' },
     freeShippingThreshold: { type: Number, default: 3000 },
     standardShippingFee: { type: Number, default: 200 },

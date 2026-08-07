@@ -89,7 +89,7 @@ const sendEmail = async (to: string, content: EmailContent): Promise<EmailDispat
       subject: content.subject,
       html: content.html,
       text: content.text,
-      replyTo: 'support@playbimboo.com'
+      replyTo: 'sales@playbimboo.com'
     });
     const acceptedCount = Array.isArray(info.accepted) ? info.accepted.length : 0;
     const rejectedCount = Array.isArray(info.rejected) ? info.rejected.length : 0;
@@ -167,10 +167,10 @@ export const buildOrderDeliveredEmail = (order: any): EmailContent => {
                 ${itemRows}
               </table>
               <p style="font-size:18px;text-align:right;color:#e11d48;font-weight:800;margin:18px 0 26px;">Total: ${total}</p>
-              <p style="line-height:1.6;margin:0 0 12px;">If anything is missing or damaged, reply to this email or contact <a href="mailto:support@playbimboo.com" style="color:#e11d48;">support@playbimboo.com</a>.</p>
+              <p style="line-height:1.6;margin:0 0 12px;">If anything is missing or damaged, reply to this email or contact <a href="mailto:sales@playbimboo.com" style="color:#e11d48;">sales@playbimboo.com</a>.</p>
               <p style="line-height:1.6;margin:0;">Thank you for choosing PlayBimboo!</p>
             </td></tr>
-            <tr><td style="background:#f8fafc;padding:18px 28px;text-align:center;color:#94a3b8;font-size:12px;">PlayBimboo Toys · Customer Support: support@playbimboo.com</td></tr>
+            <tr><td style="background:#f8fafc;padding:18px 28px;text-align:center;color:#94a3b8;font-size:12px;">PlayBimboo Toys · Customer Support: sales@playbimboo.com</td></tr>
           </table>
         </td></tr>
       </table>
@@ -183,7 +183,7 @@ export const buildOrderDeliveredEmail = (order: any): EmailContent => {
     `Order #${String(order.orderId || 'Order')} was delivered on ${deliveryDate}.`,
     `Products: ${productNames || 'PlayBimboo product'}`,
     `Total: ${total}`,
-    'Need help? Reply to this email or contact support@playbimboo.com.'
+    'Need help? Reply to this email or contact sales@playbimboo.com.'
   ].join('\n\n');
 
   return { subject, html, text };
@@ -255,9 +255,9 @@ export const buildOrderConfirmationEmail = (order: any): EmailContent => {
             <tr><td style="padding:10px 0 0;color:#0f172a;font-size:17px;font-weight:800;">Final total</td><td style="padding:10px 0 0;text-align:right;color:#e11d48;font-size:19px;font-weight:900;">${formatPkr(order.total)}</td></tr>
           </table>
           <div style="background:#f8fafc;border-radius:14px;padding:16px;margin-bottom:22px;"><h3 style="color:#0f172a;font-size:16px;margin:0 0 8px;">Delivery address</h3><p style="margin:0;line-height:1.6;color:#334155;"><strong>${escapeHtml(address.fullName || customerName)}</strong><br/>${escapeHtml(fullAddress)}${contactPhone ? `<br/>Phone: ${escapeHtml(contactPhone)}` : ''}</p></div>
-          <p style="line-height:1.6;margin:0 0 12px;">Questions about your order? Reply to this email or contact <a href="mailto:support@playbimboo.com" style="color:#e11d48;">support@playbimboo.com</a>.</p><p style="line-height:1.6;margin:0;">Thank you for choosing PlayBimboo!</p>
+          <p style="line-height:1.6;margin:0 0 12px;">Questions about your order? Reply to this email or contact <a href="mailto:sales@playbimboo.com" style="color:#e11d48;">sales@playbimboo.com</a>.</p><p style="line-height:1.6;margin:0;">Thank you for choosing PlayBimboo!</p>
         </td></tr>
-        <tr><td style="background:#f8fafc;padding:18px 28px;text-align:center;color:#94a3b8;font-size:12px;">PlayBimboo Toys &middot; Customer Support: support@playbimboo.com</td></tr>
+        <tr><td style="background:#f8fafc;padding:18px 28px;text-align:center;color:#94a3b8;font-size:12px;">PlayBimboo Toys &middot; Customer Support: sales@playbimboo.com</td></tr>
       </table>
     </td></tr></table>
   </body></html>`;
@@ -270,7 +270,7 @@ export const buildOrderConfirmationEmail = (order: any): EmailContent => {
     `Final total: ${formatPkr(order.total)}`,
     `Delivery address: ${String(address.fullName || customerName)}, ${fullAddress}${contactPhone ? `, Phone: ${contactPhone}` : ''}`,
     'Our team will contact you to confirm the order before it is dispatched.',
-    'Need help? Reply to this email or contact support@playbimboo.com.'
+    'Need help? Reply to this email or contact sales@playbimboo.com.'
   ].join('\n\n');
   return { subject, html, text };
 };
@@ -281,8 +281,8 @@ export const sendOrderConfirmationEmail = (order: any) =>
 export const sendOrderStatusEmail = async (order: any) => {
   const content: EmailContent = {
     subject: `Order Update #${String(order.orderId || 'Order')} - ${String(order.status || 'Updated')}`,
-    html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:24px;border:1px solid #e2e8f0;border-radius:16px;"><h2 style="color:#f43f5e;">PlayBimboo Order Update</h2><p>Hi <strong>${escapeHtml(order.customerName || 'Customer')}</strong>,</p><p>Order <strong>#${escapeHtml(order.orderId || 'Order')}</strong> is now <strong>${escapeHtml(order.status || 'Updated')}</strong>.</p>${order.trackingNumber ? `<p>Tracking code: <strong>${escapeHtml(order.trackingNumber)}</strong></p>` : ''}<p>Support: support@playbimboo.com</p></div>`,
-    text: `PlayBimboo order #${String(order.orderId || 'Order')} is now ${String(order.status || 'Updated')}. Support: support@playbimboo.com.`
+    html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:24px;border:1px solid #e2e8f0;border-radius:16px;"><h2 style="color:#f43f5e;">PlayBimboo Order Update</h2><p>Hi <strong>${escapeHtml(order.customerName || 'Customer')}</strong>,</p><p>Order <strong>#${escapeHtml(order.orderId || 'Order')}</strong> is now <strong>${escapeHtml(order.status || 'Updated')}</strong>.</p>${order.trackingNumber ? `<p>Tracking code: <strong>${escapeHtml(order.trackingNumber)}</strong></p>` : ''}<p>Support: sales@playbimboo.com</p></div>`,
+    text: `PlayBimboo order #${String(order.orderId || 'Order')} is now ${String(order.status || 'Updated')}. Support: sales@playbimboo.com.`
   };
   return sendEmail(String(order.email || ''), content);
 };
