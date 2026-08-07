@@ -10,8 +10,8 @@ const router = Router();
 router.post('/register', async (req: Request, res: Response) => {
   try {
     const { name, email, password } = req.body;
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: 'Name, email, and password are required' });
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
     }
     if (password.length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
@@ -22,8 +22,9 @@ router.post('/register', async (req: Request, res: Response) => {
       return res.status(409).json({ error: 'An account with this email already exists' });
     }
     const passwordHash = await bcrypt.hash(password, 10);
+    const finalName = name ? name.trim() : normalizedEmail.split('@')[0];
     // Always customer — never allow frontend to set role
-    await User.create({ name: name.trim(), email: normalizedEmail, passwordHash, role: 'customer' });
+    await User.create({ name: finalName, email: normalizedEmail, passwordHash, role: 'customer' });
     res.status(201).json({ message: 'Account created successfully. Please sign in to continue.' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -150,7 +151,7 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
 
     user.resetPasswordToken = code;
-    user.resetPasswordExpires = new Date(Date.now() + 30000); // 30 seconds
+    user.resetPasswordExpires = new Date(Date.now() + 3600000); // 1 hour
     await user.save();
 
     const { sendPasswordResetEmail } = await import('../utils/mailer.js');
@@ -184,6 +185,24 @@ router.post('/reset-password', async (req: Request, res: Response) => {
     await user.save();
 
     res.json({ message: 'Password has been successfully reset. You may now log in.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/auth/change-password (Authenticated User)
+router.post('/change-password', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+    const user = await User.findById(req.user?.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    user.passwordHash = await bcrypt.hash(newPassword, 10);
+    await user.save();
+    res.json({ message: 'Password changed successfully.' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

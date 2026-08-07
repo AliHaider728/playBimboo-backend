@@ -5,6 +5,7 @@ import Category from '../models/Category.js';
 import Settings from '../models/Settings.js';
 import User from '../models/User.js';
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 import {
   getEmailFailureCode,
   sendOrderConfirmationEmail,
@@ -384,10 +385,12 @@ router.post('/', async (req: Request, res: Response) => {
       let user = await User.findOne({ email: normalizedEmail });
       if (!user) {
         const token = crypto.randomBytes(20).toString('hex');
+        const rawPassword = crypto.randomBytes(12).toString('hex');
+        const passwordHash = await bcrypt.hash(rawPassword, 10);
         user = new User({
-          name: customerName,
+          name: customerName || normalizedEmail.split('@')[0],
           email: normalizedEmail,
-          passwordHash: 'pending_activation',
+          passwordHash,
           role: 'customer',
           resetPasswordToken: token,
           resetPasswordExpires: new Date(Date.now() + 86400000) // 24 hours

@@ -9,6 +9,7 @@ import {
   normalizeStoredNavigation,
   validateAppearanceInput
 } from '../config/storeAppearance.js';
+import { migrateSettings } from '../lib/migrateSettings.js';
 
 const router = Router();
 
@@ -28,7 +29,13 @@ const finiteNumber = (value: unknown, field: string, maximum: number) => {
   return number;
 };
 
+let migrationRun = false;
+
 const getSettings = async () => {
+  if (!migrationRun) {
+    await migrateSettings();
+    migrationRun = true;
+  }
   let settings = await Settings.findOne();
   if (!settings) settings = await Settings.create({});
   return settings;
