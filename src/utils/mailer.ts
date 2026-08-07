@@ -423,3 +423,51 @@ export const sendAdminNewOrderEmail = async (order: any, recipients: string[]) =
   const to = recipients.join(',');
   return sendEmail(to, buildAdminNewOrderEmail(order));
 };
+
+export const sendPasswordResetEmail = async (user: any, token: string) => {
+  const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`;
+  const subject = 'Reset your PlayBimboo password';
+  const html = `
+    <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#333;">
+      <h2 style="color:#e11d48;">PlayBimboo Password Reset</h2>
+      <p>Hello ${escapeHtml(user.name)},</p>
+      <p>You recently requested to reset your password for your PlayBimboo account. Click the button below to reset it.</p>
+      <div style="margin: 30px 0;">
+        <a href="${resetUrl}" style="background-color:#e11d48;color:#fff;padding:12px 24px;text-decoration:none;border-radius:8px;font-weight:bold;">Reset Password</a>
+      </div>
+      <p>If you did not request a password reset, please ignore this email or reply to let us know. This password reset link is only valid for the next 1 hour.</p>
+      <p>Thanks,<br>The PlayBimboo Team</p>
+    </div>
+  `;
+  const text = `Hello ${user.name},\n\nYou recently requested to reset your password for your PlayBimboo account. Please visit the link below to reset it:\n${resetUrl}\n\nIf you did not request this, please ignore this email.\n\nThanks,\nThe PlayBimboo Team`;
+  
+  return sendEmail(user.email, { subject, html, text });
+};
+
+export const sendAccountActivationEmail = async (user: any, token: string) => {
+  const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}&activate=1`;
+  const subject = 'Activate Your PlayBimboo Account';
+  const html = `
+    <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#333;">
+      <h2 style="color:#e11d48;">Welcome to PlayBimboo!</h2>
+      <p>Hello ${escapeHtml(user.name)},</p>
+      <p>Thank you for your recent order! We've created an account for you to easily track your orders and manage your wishlist.</p>
+      <p>Please click the button below to set your password and activate your account.</p>
+      <div style="margin: 30px 0;">
+        <a href="${resetUrl}" style="background-color:#e11d48;color:#fff;padding:12px 24px;text-decoration:none;border-radius:8px;font-weight:bold;">Set Your Password</a>
+      </div>
+      <p>This activation link is only valid for the next 24 hours.</p>
+      <p>Thanks,<br>The PlayBimboo Team</p>
+    </div>
+  `;
+  const text = `Hello ${user.name},\n\nThank you for your recent order! We've created an account for you to easily track your orders. Please visit the link below to set your password and activate your account:\n${resetUrl}\n\nThanks,\nThe PlayBimboo Team`;
+  
+  return sendEmail(user.email, { subject, html, text });
+};
+
+export const sendContactConfirmationEmail = async (email: string, name: string) => {
+  const subject = 'Thank you for contacting PlayBimboo';
+  const html = `<h1>Hello ${name},</h1><p>Thank you for your enquiry. We have received your message and will contact you as soon as possible.</p><br/><p>Best regards,<br/>The PlayBimboo Team</p>`;
+  const text = `Hello ${name},\n\nThank you for your enquiry. We have received your message and will contact you as soon as possible.\n\nBest regards,\nThe PlayBimboo Team`;
+  return sendEmail(email, { subject, html, text });
+};

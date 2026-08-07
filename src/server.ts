@@ -12,6 +12,7 @@ import authRoutes from './routes/auth.js';
 import uploadRoutes from './routes/upload.js';
 import seedRoutes from './routes/seed.js';
 import globalAttributeRoutes from './routes/globalAttributes.js';
+import contactRoutes from './routes/contact.js';
 
 const app = express();
 
@@ -78,5 +79,6 @@ app.use('/api/reviews', requireDatabaseConnection, reviewRoutes);
 app.use('/api/auth', requireDatabaseConnection, authRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/seed', requireDatabaseConnection, seedRoutes);
+app.use('/api/contact', requireDatabaseConnection, contactRoutes);
 
 export default app;

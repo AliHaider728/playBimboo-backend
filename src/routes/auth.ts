@@ -111,4 +111,59 @@ router.get('/users', authenticateToken, requireAdmin, async (req: AuthRequest, r
   }
 });
 
+// POST /api/auth/forgot-password
+router.post('/forgot-password', async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email is required' });
+
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    if (!user) {
+      // Don't leak whether the email exists.
+      return res.json({ message: 'If an account exists, a password reset link has been sent.' });
+    }
+
+    const { randomBytes } = await import('crypto');
+    const token = randomBytes(20).toString('hex');
+
+    user.resetPasswordToken = token;
+    user.resetPasswordExpires = new Date(Date.now() + 3600000); // 1 hour
+    await user.save();
+
+    const { sendPasswordResetEmail } = await import('../utils/mailer.js');
+    await sendPasswordResetEmail(user, token);
+
+    res.json({ message: 'If an account exists, a password reset link has been sent.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/auth/reset-password
+router.post('/reset-password', async (req: Request, res: Response) => {
+  try {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) return res.status(400).json({ error: 'Token and new password are required' });
+    if (newPassword.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: 'Password reset token is invalid or has expired.' });
+    }
+
+    user.passwordHash = await bcrypt.hash(newPassword, 10);
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+
+    res.json({ message: 'Password has been successfully reset. You may now log in.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

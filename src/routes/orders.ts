@@ -3,13 +3,16 @@ import Order from '../models/Order.js';
 import Product from '../models/Product.js';
 import Category from '../models/Category.js';
 import Settings from '../models/Settings.js';
+import User from '../models/User.js';
+import crypto from 'crypto';
 import {
   getEmailFailureCode,
   sendOrderConfirmationEmail,
   sendOrderDeliveredEmail,
   sendOrderStatusEmail,
   sendAdminNewOrderEmail,
-  getAdminNotificationRecipients
+  getAdminNotificationRecipients,
+  sendAccountActivationEmail
 } from '../utils/mailer.js';
 import { authenticateToken, requireAdmin, AuthRequest } from '../middleware/auth.js';
 import { hasVariantGroups, normalizeInventory } from '../lib/inventory.js';
@@ -354,10 +357,12 @@ router.post('/', async (req: Request, res: Response) => {
     const orderId = `ORD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
     const dateStr = new Date().toISOString().split('T')[0];
 
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+
     const newOrder = new Order({
       orderId,
       customerName,
-      email: typeof email === 'string' ? email.trim().toLowerCase() : '',
+      email: normalizedEmail,
       phone,
       items: canonicalItems,
       subtotal: computedSubtotal,
@@ -373,6 +378,24 @@ router.post('/', async (req: Request, res: Response) => {
     });
 
     await newOrder.save();
+
+    // Account creation / reuse logic
+    if (normalizedEmail) {
+      let user = await User.findOne({ email: normalizedEmail });
+      if (!user) {
+        const token = crypto.randomBytes(20).toString('hex');
+        user = new User({
+          name: customerName,
+          email: normalizedEmail,
+          passwordHash: 'pending_activation',
+          role: 'customer',
+          resetPasswordToken: token,
+          resetPasswordExpires: new Date(Date.now() + 86400000) // 24 hours
+        });
+        await user.save();
+        await sendAccountActivationEmail(user, token).catch(err => console.error('Failed to send activation email:', err));
+      }
+    }
 
     // Deduct stock for ordered products
     for (const item of canonicalItems) {

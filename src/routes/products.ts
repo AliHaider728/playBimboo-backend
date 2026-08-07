@@ -770,6 +770,39 @@ router.post('/import/csv', authenticateToken, requireAdmin, upload.single('file'
   }
 });
 
+// GET related products
+router.get('/:idOrSlug/related', authenticateIfPresent, async (req: AuthRequest, res: Response) => {
+  try {
+    const { idOrSlug } = req.params;
+    let product = await Product.findOne({ slug: idOrSlug, isVisible: { $ne: false }, status: { $ne: 'draft' } });
+    if (!product && idOrSlug.match(/^[0-9a-fA-F]{24}$/)) {
+      product = await Product.findOne({ _id: idOrSlug, isVisible: { $ne: false }, status: { $ne: 'draft' } });
+    }
+
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    const currentCategoryIds = product.categoryIds?.length ? product.categoryIds : product.categoryId ? [product.categoryId] : [];
+    const currentAgeGroups = product.ageGroups?.length ? product.ageGroups : [];
+
+    const related = await Product.find({
+      _id: { $ne: product._id },
+      isVisible: { $ne: false },
+      status: { $ne: 'draft' },
+      $or: [
+        { categoryIds: { $in: currentCategoryIds } },
+        { categoryId: { $in: currentCategoryIds } },
+        { ageGroups: { $in: currentAgeGroups } }
+      ]
+    }).limit(4);
+
+    res.json(await serializeProducts(related));
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET single product by slug or ID
 router.get('/:idOrSlug', authenticateIfPresent, async (req: AuthRequest, res: Response) => {
   try {

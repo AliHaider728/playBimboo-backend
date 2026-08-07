@@ -6,6 +6,8 @@ export interface IUser extends Document {
   passwordHash: string;
   role: 'super_admin' | 'admin' | 'customer';
   wishlist?: string[];
+  resetPasswordToken?: string;
+  resetPasswordExpires?: Date;
   createdAt: Date;
 }
 
@@ -15,7 +17,9 @@ const UserSchema = new Schema<IUser>(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
     role: { type: String, enum: ['super_admin', 'admin', 'customer'], default: 'customer' },
-    wishlist: [{ type: String }]
+    wishlist: [{ type: String }],
+    resetPasswordToken: { type: String },
+    resetPasswordExpires: { type: Date }
   },
   { timestamps: true }
 );
