@@ -135,6 +135,7 @@ const serializeProducts = async (values: any[]) => {
 
 const getProductImagePublicIds = (product: Record<string, any>) => [
   ...(Array.isArray(product.imagePublicIds) ? product.imagePublicIds : []),
+  ...(Array.isArray(product.imageThumbnailPublicIds) ? product.imageThumbnailPublicIds : []),
   ...(Array.isArray(product.productDetailBlocks)
     ? product.productDetailBlocks.map((block: any) => block?.image?.publicId)
     : [])
@@ -147,9 +148,10 @@ const deleteImagesUnusedByOtherProducts = async (publicIds: string[], excludedPr
     _id: { $ne: excludedProductId },
     $or: [
       { imagePublicIds: { $in: uniqueIds } },
+      { imageThumbnailPublicIds: { $in: uniqueIds } },
       { 'productDetailBlocks.image.publicId': { $in: uniqueIds } }
     ]
-  }).select('imagePublicIds productDetailBlocks.image.publicId').lean();
+  }).select('imagePublicIds imageThumbnailPublicIds productDetailBlocks.image.publicId').lean();
   const referencedIds = new Set(referenced.flatMap(product => getProductImagePublicIds(product)));
   const safeToDelete = uniqueIds.filter(publicId => !referencedIds.has(publicId));
   if (safeToDelete.length > 0) await deleteProductImages(safeToDelete);
@@ -263,6 +265,54 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
     }
     if (publicId && new URL(image).hostname !== 'res.cloudinary.com') {
       throw new Error('Cloudinary public IDs must be paired with Cloudinary HTTPS URLs');
+    }
+    return publicId;
+  });
+
+  const existingThumbnailsByImageUrl = new Map<string, { url: string; publicId: string }>();
+  if (Array.isArray(current?.images)) {
+    current.images.forEach((image: unknown, index: number) => {
+      const thumbnailUrl = current?.imageThumbnailUrls?.[index];
+      const thumbnailPublicId = current?.imageThumbnailPublicIds?.[index];
+      if (typeof image === 'string') {
+        existingThumbnailsByImageUrl.set(image, {
+          url: typeof thumbnailUrl === 'string' ? thumbnailUrl : '',
+          publicId: typeof thumbnailPublicId === 'string' ? thumbnailPublicId : ''
+        });
+      }
+    });
+  }
+  const submittedThumbnailUrls = Array.isArray(body.imageThumbnailUrls)
+    ? body.imageThumbnailUrls
+    : undefined;
+  const submittedThumbnailPublicIds = Array.isArray(body.imageThumbnailPublicIds)
+    ? body.imageThumbnailPublicIds
+    : undefined;
+  const imageThumbnailUrls = images.map((image: string, index: number) => {
+    const submitted = submittedThumbnailUrls?.[index];
+    const url = typeof submitted === 'string'
+      ? submitted.trim()
+      : existingThumbnailsByImageUrl.get(image)?.url || '';
+    if (url) {
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'https:' || parsed.hostname !== 'res.cloudinary.com') throw new Error();
+      } catch {
+        throw new Error('Product thumbnail URLs must be secure Cloudinary URLs');
+      }
+    }
+    return url;
+  });
+  const imageThumbnailPublicIds = images.map((image: string, index: number) => {
+    const submitted = submittedThumbnailPublicIds?.[index];
+    const publicId = typeof submitted === 'string'
+      ? submitted.trim()
+      : existingThumbnailsByImageUrl.get(image)?.publicId || '';
+    if (publicId && !isProductImagePublicId(publicId)) {
+      throw new Error('Invalid PlayBimboo product thumbnail public ID');
+    }
+    if (Boolean(publicId) !== Boolean(imageThumbnailUrls[index])) {
+      throw new Error('Product thumbnail URL and public ID must be provided together');
     }
     return publicId;
   });
@@ -460,6 +510,8 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
     lowStockThreshold: inventory.trackInventory ? inventory.lowStockThreshold : null,
     images,
     imagePublicIds,
+    imageThumbnailUrls,
+    imageThumbnailPublicIds,
     shortDescription: sanitizePlainText(merged.shortDescription, 300),
     description,
     isVisible: merged.isVisible !== false,

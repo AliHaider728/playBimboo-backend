@@ -91,6 +91,8 @@ export interface IProduct extends Document {
   stockStatus?: 'in_stock' | 'out_of_stock';
   images: string[];
   imagePublicIds: string[];
+  imageThumbnailUrls: string[];
+  imageThumbnailPublicIds: string[];
   shortDescription?: string;
   description?: string;
   isVisible: boolean;
@@ -215,6 +217,22 @@ const ProductSchema = new Schema<IProduct>(
       validate: {
         validator: (publicIds: string[]) => publicIds.length <= 9,
         message: 'A product can have at most 9 Cloudinary image public IDs'
+      }
+    },
+    imageThumbnailUrls: {
+      type: [{ type: String }],
+      default: [],
+      validate: {
+        validator: (urls: string[]) => urls.length <= 9,
+        message: 'A product can have at most 9 thumbnail URLs'
+      }
+    },
+    imageThumbnailPublicIds: {
+      type: [{ type: String }],
+      default: [],
+      validate: {
+        validator: (publicIds: string[]) => publicIds.length <= 9,
+        message: 'A product can have at most 9 thumbnail public IDs'
       }
     },
     shortDescription: { type: String, maxlength: 300 },

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
 
 export const PRODUCT_IMAGE_FOLDER = 'playbimboo/products';
+export const PRODUCT_THUMBNAIL_FOLDER = `${PRODUCT_IMAGE_FOLDER}/thumbnails`;
 export const PRODUCT_DETAIL_IMAGE_FOLDER = `${PRODUCT_IMAGE_FOLDER}/detail-content`;
 export const CATEGORY_IMAGE_FOLDER = 'playbimboo/categories';
 
@@ -32,7 +33,7 @@ export const isCategoryImagePublicId = (publicId: string) =>
   publicId.startsWith(`${CATEGORY_IMAGE_FOLDER}/`) &&
   publicId.length > CATEGORY_IMAGE_FOLDER.length + 1;
 
-const uploadProductImageToFolder = (file: Express.Multer.File, folder: string) =>
+const uploadImageBufferToFolder = (buffer: Buffer, folder: string) =>
   new Promise<{ url: string; publicId: string }>((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
       {
@@ -57,17 +58,20 @@ const uploadProductImageToFolder = (file: Express.Multer.File, folder: string) =
       }
     );
 
-    uploadStream.end(file.buffer);
+    uploadStream.end(buffer);
   });
 
 export const uploadProductImage = (file: Express.Multer.File) =>
-  uploadProductImageToFolder(file, PRODUCT_IMAGE_FOLDER);
+  uploadImageBufferToFolder(file.buffer, PRODUCT_IMAGE_FOLDER);
+
+export const uploadProductThumbnail = (buffer: Buffer) =>
+  uploadImageBufferToFolder(buffer, PRODUCT_THUMBNAIL_FOLDER);
 
 export const uploadProductDetailImage = (file: Express.Multer.File) =>
-  uploadProductImageToFolder(file, PRODUCT_DETAIL_IMAGE_FOLDER);
+  uploadImageBufferToFolder(file.buffer, PRODUCT_DETAIL_IMAGE_FOLDER);
 
 export const uploadCategoryImage = (file: Express.Multer.File) =>
-  uploadProductImageToFolder(file, CATEGORY_IMAGE_FOLDER);
+  uploadImageBufferToFolder(file.buffer, CATEGORY_IMAGE_FOLDER);
 
 export const deleteProductImage = async (publicId: string) => {
   if (!isProductImagePublicId(publicId)) {

@@ -7,8 +7,10 @@ import {
   hasCloudinaryConfiguration,
   uploadProductDetailImage,
   uploadProductImage,
+  uploadProductThumbnail,
   uploadCategoryImage
 } from '../lib/cloudinary.js';
+import { createProductThumbnail } from '../lib/productImages.js';
 import Product from '../models/Product.js';
 import Category from '../models/Category.js';
 import { connectToDatabase } from '../lib/database.js';
@@ -56,11 +58,22 @@ router.post(
     }
 
     try {
+      const thumbnailBuffer = await createProductThumbnail(req.file.buffer);
       const result = await uploadProductImage(req.file);
+      let thumbnail: Awaited<ReturnType<typeof uploadProductThumbnail>>;
+      try {
+        thumbnail = await uploadProductThumbnail(thumbnailBuffer);
+      } catch {
+        await deleteProductImage(result.publicId).catch(() => undefined);
+        throw new Error('Product thumbnail upload failed');
+      }
       res.json({
         url: result.url,
         secureUrl: result.url,
         publicId: result.publicId,
+        thumbnailUrl: thumbnail.url,
+        thumbnailSecureUrl: thumbnail.url,
+        thumbnailPublicId: thumbnail.publicId,
         filename: result.publicId,
         mimetype: req.file.mimetype,
         size: req.file.size
@@ -161,6 +174,7 @@ router.delete(
       const referencedProduct = await Product.exists({
         $or: [
           { imagePublicIds: publicId },
+          { imageThumbnailPublicIds: publicId },
           { 'productDetailBlocks.image.publicId': publicId }
         ]
       });
