@@ -46,19 +46,24 @@ const sendAndTrackAdminNewOrderNotification = async (order: any) => {
   const recipients = getAdminNotificationRecipients();
   if (recipients.length === 0) {
     order.newOrderEmailError = 'NEW_ORDER_RECIPIENT_NOT_CONFIGURED';
+    console.warn(`[Admin Email] No recipients configured for order ${order.orderId}`);
     await order.save();
     return;
   }
 
   order.newOrderEmailRecipients = recipients;
+  console.log(`[Admin Email] Attempting to send order ${order.orderId} to ${recipients.length} recipients:`, recipients);
 
   try {
     const delivery = await sendAdminNewOrderEmail(order, recipients);
     order.newOrderEmailSentAt = new Date();
     order.newOrderEmailMessageId = delivery.messageId;
     order.newOrderEmailError = undefined;
-  } catch (error) {
-    order.newOrderEmailError = getEmailFailureCode(error);
+    console.log(`[Admin Email] Successfully dispatched order ${order.orderId} notification. Accepted: ${delivery.acceptedCount}, Rejected: ${delivery.rejectedCount}, MessageId: ${delivery.messageId}`);
+  } catch (error: any) {
+    const failureCode = getEmailFailureCode(error);
+    order.newOrderEmailError = failureCode;
+    console.error(`[Admin Email] Failed to dispatch order ${order.orderId} notification. Category: ${failureCode}, Error:`, error?.message || error);
     logEmailFailure('Admin new order', order.orderId, error);
   }
   await order.save();
@@ -375,11 +380,23 @@ router.post('/', async (req: Request, res: Response) => {
         // Atomic deduction via findOneAndUpdate
         if (item.productType === 'variable' && item.variationId) {
            await Product.findOneAndUpdate(
-             { _id: item.productId, 'variations.id': item.variationId },
+             { 
+               _id: item.productId, 
+               'variations.id': item.variationId,
+               'variations.stockQuantity': { $type: 'number', $gte: item.quantity }
+             },
              { $inc: { 'variations.$.stockQuantity': -item.quantity } }
            );
-        } else {
+        } else if (item.selectedVariant) {
            await adjustProductStock(item.productId, -item.quantity, item.selectedVariant);
+        } else {
+           await Product.findOneAndUpdate(
+             { 
+               _id: item.productId, 
+               stockQuantity: { $type: 'number', $gte: item.quantity }
+             },
+             { $inc: { stockQuantity: -item.quantity } }
+           );
         }
       }
     }
@@ -398,46 +415,7 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-// POST Cancel Order within 24 hours
-router.post('/:orderId/cancel', async (req: Request, res: Response) => {
-  try {
-    const order = await Order.findOne({ orderId: req.params.orderId });
-    if (!order) return res.status(404).json({ error: 'Order not found' });
 
-    // Check 24 hour limit
-    const orderTime = new Date(order.createdAt).getTime();
-    const currentTime = new Date().getTime();
-    const hoursElapsed = (currentTime - orderTime) / (1000 * 60 * 60);
-
-    if (hoursElapsed > 24) {
-      return res.status(400).json({ error: 'Order cancellation window (24 hours) has expired. Please contact support.' });
-    }
-
-    if (order.status === 'Cancelled') {
-      return res.status(400).json({ error: 'Order is already cancelled' });
-    }
-
-    order.status = 'Cancelled';
-    await order.save();
-
-    // Restock items
-    for (const item of order.items) {
-      if (item.productId) {
-        await adjustProductStock(item.productId, item.quantity, item.selectedVariant);
-      }
-    }
-
-    if (order.email) {
-      void sendOrderStatusEmail(order).catch(error =>
-        logEmailFailure('Order status', order.orderId, error)
-      );
-    }
-
-    res.json({ message: 'Order successfully cancelled within 24h window', order });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // PUT Update Order Status (Admin)
 router.put('/:orderId/status', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
