@@ -24,6 +24,7 @@ export interface IShippingAddress {
 }
 
 export interface IOrder extends Document {
+  userId?: mongoose.Types.ObjectId;
   orderId: string; // e.g. "ORD-92841"
   customerName: string;
   email: string;
@@ -51,6 +52,7 @@ export interface IOrder extends Document {
   deliveredEmailAccepted?: boolean;
   deliveredEmailFailedAt?: Date;
   deliveredEmailFailureCode?: string;
+  shippedEmailSentAt?: Date;
   newOrderEmailSentAt?: Date;
   newOrderEmailMessageId?: string;
   newOrderEmailError?: string;
@@ -61,6 +63,7 @@ export interface IOrder extends Document {
 
 const OrderSchema = new Schema<IOrder>(
   {
+    userId: { type: Schema.Types.ObjectId, ref: 'User' },
     orderId: { type: String, required: true, unique: true },
     customerName: { type: String, required: true },
     email: { type: String, trim: true, default: '' },

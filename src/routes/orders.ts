@@ -173,7 +173,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
         filter.email = email.trim().toLowerCase();
       }
     } else {
-      filter.email = req.user?.email.toLowerCase();
+      filter.userId = req.user?.userId;
     }
 
     const orders = await Order.find(filter).sort({ createdAt: -1 });
@@ -357,10 +357,32 @@ router.post('/', async (req: Request, res: Response) => {
 
     const orderId = `ORD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
     const dateStr = new Date().toISOString().split('T')[0];
-
     const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
 
+    // Account creation / reuse logic
+    let orderUserId;
+    if (normalizedEmail) {
+      let user = await User.findOne({ email: normalizedEmail });
+      if (!user) {
+        const token = crypto.randomBytes(20).toString('hex');
+        const rawPassword = crypto.randomBytes(12).toString('hex');
+        const passwordHash = await bcrypt.hash(rawPassword, 10);
+        user = new User({
+          name: customerName || normalizedEmail.split('@')[0],
+          email: normalizedEmail,
+          passwordHash,
+          role: 'customer',
+          resetPasswordToken: token,
+          resetPasswordExpires: new Date(Date.now() + 86400000) // 24 hours
+        });
+        await user.save();
+        await sendAccountActivationEmail(user, token).catch(err => console.error('Failed to send activation email:', err));
+      }
+      orderUserId = user._id;
+    }
+
     const newOrder = new Order({
+      userId: orderUserId,
       orderId,
       customerName,
       email: normalizedEmail,
@@ -379,26 +401,6 @@ router.post('/', async (req: Request, res: Response) => {
     });
 
     await newOrder.save();
-
-    // Account creation / reuse logic
-    if (normalizedEmail) {
-      let user = await User.findOne({ email: normalizedEmail });
-      if (!user) {
-        const token = crypto.randomBytes(20).toString('hex');
-        const rawPassword = crypto.randomBytes(12).toString('hex');
-        const passwordHash = await bcrypt.hash(rawPassword, 10);
-        user = new User({
-          name: customerName || normalizedEmail.split('@')[0],
-          email: normalizedEmail,
-          passwordHash,
-          role: 'customer',
-          resetPasswordToken: token,
-          resetPasswordExpires: new Date(Date.now() + 86400000) // 24 hours
-        });
-        await user.save();
-        await sendAccountActivationEmail(user, token).catch(err => console.error('Failed to send activation email:', err));
-      }
-    }
 
     // Deduct stock for ordered products
     for (const item of canonicalItems) {
