@@ -5,6 +5,7 @@ export const PRODUCT_IMAGE_FOLDER = 'playbimboo/products';
 export const PRODUCT_THUMBNAIL_FOLDER = `${PRODUCT_IMAGE_FOLDER}/thumbnails`;
 export const PRODUCT_DETAIL_IMAGE_FOLDER = `${PRODUCT_IMAGE_FOLDER}/detail-content`;
 export const CATEGORY_IMAGE_FOLDER = 'playbimboo/categories';
+export const REVIEW_IMAGE_FOLDER = 'playbimboo/reviews';
 
 export const hasCloudinaryConfiguration = Boolean(
   process.env.CLOUDINARY_CLOUD_NAME &&
@@ -72,6 +73,9 @@ export const uploadProductDetailImage = (file: Express.Multer.File) =>
 
 export const uploadCategoryImage = (file: Express.Multer.File) =>
   uploadImageBufferToFolder(file.buffer, CATEGORY_IMAGE_FOLDER);
+
+export const uploadReviewImage = (file: Express.Multer.File) =>
+  uploadImageBufferToFolder(file.buffer, REVIEW_IMAGE_FOLDER);
 
 export const deleteProductImage = async (publicId: string) => {
   if (!isProductImagePublicId(publicId)) {

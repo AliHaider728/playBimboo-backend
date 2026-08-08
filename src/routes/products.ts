@@ -23,6 +23,25 @@ import { getApprovedReviewSummaries, ReviewSummary } from '../lib/productReviews
 import { syncProductGlobalAttributes } from '../lib/globalAttributes.js';
 
 const router = Router();
+
+// TEMPORARY SEED ROUTE
+router.get('/seed-sold-count', async (req, res) => {
+  try {
+    const products = await Product.find({});
+    let updated = 0;
+    for (const p of products) {
+      if (p.soldCount === undefined || p.soldCount === null) {
+        p.soldCount = Math.floor(Math.random() * (500 - 50 + 1)) + 50;
+        await p.save();
+        updated++;
+      }
+    }
+    res.json({ success: true, updated });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }
@@ -838,6 +857,11 @@ router.get('/:idOrSlug', authenticateIfPresent, async (req: AuthRequest, res: Re
 
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
+    }
+
+    if (product.soldCount === undefined || product.soldCount === null) {
+      product.soldCount = Math.floor(Math.random() * (500 - 50 + 1)) + 50;
+      await product.save();
     }
     res.json((await serializeProducts([product]))[0]);
   } catch (err: any) {

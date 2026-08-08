@@ -8,7 +8,8 @@ import {
   uploadProductDetailImage,
   uploadProductImage,
   uploadProductThumbnail,
-  uploadCategoryImage
+  uploadCategoryImage,
+  uploadReviewImage
 } from '../lib/cloudinary.js';
 import { createProductThumbnail } from '../lib/productImages.js';
 import Product from '../models/Product.js';
@@ -99,6 +100,24 @@ router.post(
     } catch {
       console.error('Cloudinary category image upload failed.');
       res.status(502).json({ error: 'Cloudinary category image upload failed' });
+    }
+  }
+);
+
+router.post(
+  '/review-image',
+  authenticateToken,
+  requireAdmin,
+  requireCloudinaryConfiguration,
+  upload.single('image'),
+  async (req: Request, res: Response) => {
+    if (!req.file) return res.status(400).json({ error: 'No image file uploaded' });
+    try {
+      const result = await uploadReviewImage(req.file);
+      res.json({ secureUrl: result.url, url: result.url, publicId: result.publicId });
+    } catch {
+      console.error('Cloudinary review image upload failed.');
+      res.status(502).json({ error: 'Cloudinary review image upload failed' });
     }
   }
 );

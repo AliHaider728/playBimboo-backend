@@ -156,7 +156,7 @@ router.get('/admin', authenticateToken, requireAdmin, async (req: Request, res: 
 // POST Admin creates a review (Admin)
 router.post('/admin', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
-    const { productId, productName, reviewerName, rating, title, content, avatarUrl, verifiedPurchase } = req.body;
+    const { productId, productName, reviewerName, rating, title, content, avatarUrl, imageUrl, imagePublicId, verifiedPurchase } = req.body;
     if (!productId || !rating || !content || !reviewerName) {
       return res.status(400).json({ error: 'Missing required review fields' });
     }
@@ -169,6 +169,8 @@ router.post('/admin', authenticateToken, requireAdmin, async (req: AuthRequest, 
       title,
       content,
       avatarUrl,
+      imageUrl,
+      imagePublicId,
       status: 'approved',
       source: 'admin',
       verifiedPurchase: Boolean(verifiedPurchase),

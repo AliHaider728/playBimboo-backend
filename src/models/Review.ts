@@ -9,6 +9,8 @@ export interface IReview extends Document {
   title?: string;
   content: string;
   avatarUrl?: string;
+  imageUrl?: string;
+  imagePublicId?: string;
   verifiedPurchase: boolean;
   source: 'customer' | 'admin';
   status: 'pending' | 'approved' | 'rejected';
@@ -36,6 +38,8 @@ const ReviewSchema = new Schema<IReview>(
     title: { type: String },
     content: { type: String, required: true },
     avatarUrl: { type: String },
+    imageUrl: { type: String },
+    imagePublicId: { type: String },
     verifiedPurchase: { type: Boolean, default: false },
     source: { type: String, enum: ['customer', 'admin'], default: 'customer' },
     status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending', index: true },

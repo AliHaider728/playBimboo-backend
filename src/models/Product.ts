@@ -5,6 +5,7 @@ export interface IProductAttributeTerm {
   id: string; // matches globalTermId if global, or custom id
   label: string;
   slug: string;
+  soldCount?: number;
   value: string;
   colorValue?: string;
   imageUrl?: string;
@@ -184,6 +185,7 @@ const ProductSchema = new Schema<IProduct>(
     defaultVariationId: { type: String, trim: true },
     name: { type: String, required: true },
     slug: { type: String, required: true, unique: true },
+  soldCount: { type: Number, default: 0 },
     sku: { type: String, trim: true, uppercase: true, unique: true, sparse: true },
     price: { type: Number, required: true, min: 0 },
     originalPrice: { type: Number, min: 0 },
