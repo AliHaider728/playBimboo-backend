@@ -10,8 +10,25 @@ const router = Router();
 // GET approved reviews for a specific product (Public)
 router.get('/product/:productId', async (req: Request, res: Response) => {
   try {
+    const { productId } = req.params;
+    let searchIds = [productId];
+
+    // If it's a valid ObjectId, we can search by _id or slug
+    // We should also find the product to get both identifiers just to be safe.
+    const Product = mongoose.model('Product');
+    const product = await Product.findOne({
+      $or: [
+        { _id: mongoose.Types.ObjectId.isValid(productId) ? productId : null },
+        { slug: productId }
+      ]
+    });
+    
+    if (product) {
+       searchIds = [String(product._id), product.slug];
+    }
+
     const reviews = await Review.find({
-      productId: req.params.productId,
+      productId: { $in: searchIds },
       status: 'approved'
     }).sort({ createdAt: -1 });
 

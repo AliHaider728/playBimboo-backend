@@ -42,39 +42,44 @@ async function seedReviews() {
       process.exit(0);
     }
 
-    const totalReviews = 40;
-    console.log(`Generating ${totalReviews} reviews...`);
-    
     let createdCount = 0;
 
-    for (let i = 0; i < totalReviews; i++) {
-      const product = products[Math.floor(Math.random() * products.length)];
-      const template = reviewTemplates[Math.floor(Math.random() * reviewTemplates.length)];
-      const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
-      const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
-      const reviewerName = `${firstName} ${lastName}`;
+    for (const product of products) {
+      // Generate between 5 and 8 reviews per product
+      const reviewsForProduct = Math.floor(Math.random() * 4) + 5;
       
-      let rating = template.rating;
-      if (Math.random() > 0.8 && rating > 3) rating -= 1;
+      for (let i = 0; i < reviewsForProduct; i++) {
+        const template = reviewTemplates[Math.floor(Math.random() * reviewTemplates.length)];
+        const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
+        const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+        const reviewerName = `${firstName} ${lastName}`;
+        
+        let rating = template.rating;
+        if (Math.random() > 0.8 && rating > 3) rating -= 1;
 
-      const reviewData = {
-        productId: String(product._id),
-        productName: product.name,
-        reviewerName,
-        rating,
-        title: template.title,
-        content: template.text,
-        verifiedPurchase: Math.random() > 0.3,
-        status: 'approved',
-        source: 'admin'
-      };
+        const reviewData = {
+          productId: String(product._id),
+          productName: product.name,
+          reviewerName,
+          rating,
+          title: template.title,
+          content: template.text,
+          verifiedPurchase: Math.random() > 0.3,
+          status: 'approved',
+          source: 'admin'
+        };
 
-      await Review.create(reviewData);
-      createdCount++;
-      process.stdout.write('.');
+        try {
+          await Review.create(reviewData);
+          createdCount++;
+          process.stdout.write('.');
+        } catch (err: any) {
+          console.error(`\nFailed to insert review for ${product.name}:`, err.message);
+        }
+      }
     }
 
-    console.log(`\nSuccessfully created ${createdCount} reviews.`);
+    console.log(`\nSuccessfully created ${createdCount} reviews across ${products.length} products.`);
     process.exit(0);
 
   } catch (error: any) {

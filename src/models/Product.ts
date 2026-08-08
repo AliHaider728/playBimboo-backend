@@ -105,6 +105,7 @@ export interface IProduct extends Document {
   isBestseller: boolean;
   isNewArrival: boolean;
   isSpotlight: boolean;
+  soldCount?: number;
   lowStockThreshold?: number | null;
   weight?: number;
   deliveryType?: 'store_threshold' | 'category' | 'fixed' | 'free' | 'none';

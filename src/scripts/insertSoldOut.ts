@@ -33,7 +33,7 @@ const Product = mongoose.models.Product || mongoose.model('Product', productSche
 async function addSoldOutProduct() {
   try {
     console.log('Connecting to MongoDB...');
-    await mongoose.connect(MONGODB_URI, {
+    await mongoose.connect(MONGODB_URI as string, {
       serverSelectionTimeoutMS: 5000
     });
     console.log('Connected.');
