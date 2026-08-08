@@ -98,12 +98,32 @@ router.post('/', async (req: Request, res: Response) => {
 // GET all reviews for Admin Moderation (Admin)
 router.get('/admin', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { status, source, rating, search, page = 1, limit = 50 } = req.query;
+    const { status, source, rating, search, productId, page = 1, limit = 50 } = req.query;
     
     const query: any = {};
     if (status) query.status = status;
     if (source) query.source = source;
     if (rating) query.rating = Number(rating);
+
+    // If filtering by product, resolve both _id and slug so we match reviews
+    // regardless of which identifier was stored when the review was created.
+    if (productId) {
+      const Product = mongoose.model('Product');
+      const product = await Product.findOne({
+        $or: [
+          { _id: mongoose.Types.ObjectId.isValid(productId as string) ? productId : null },
+          { slug: productId }
+        ]
+      }).select('_id slug');
+
+      if (product) {
+        query.productId = { $in: [String(product._id), product.slug] };
+      } else {
+        // No matching product — fall back to exact match so we don't silently ignore the filter
+        query.productId = productId;
+      }
+    }
+
     if (search) {
       query.$or = [
         { reviewerName: { $regex: search, $options: 'i' } },
