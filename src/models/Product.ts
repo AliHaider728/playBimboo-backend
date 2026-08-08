@@ -332,4 +332,13 @@ ProductSchema.index(
   { unique: true, partialFilterExpression: { isSpotlight: true } }
 );
 
+// Compound indexes for the related-products query (/products/:id/related).
+// Without these, every related-products request causes a full collection scan
+// on isVisible + status + categoryIds/categoryId/ageGroups.
+ProductSchema.index({ categoryIds: 1, isVisible: 1, status: 1 });
+ProductSchema.index({ categoryId: 1, isVisible: 1, status: 1 });
+ProductSchema.index({ ageGroups: 1, isVisible: 1, status: 1 });
+// General-purpose index for listing queries (shop, admin, etc.)
+ProductSchema.index({ isVisible: 1, status: 1, createdAt: -1 });
+
 export default mongoose.model<IProduct>('Product', ProductSchema);
