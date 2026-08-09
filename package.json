@@ -7,12 +7,12 @@
     "node": "24.x"
   },
   "scripts": {
-    "dev": "tsx src/local.ts",
+    "dev": "tsx src/server.ts",
     "build": "tsc",
     "backfill:product-thumbnails": "tsx src/scripts/backfillProductThumbnails.ts",
     "migrate:product-merchandising": "tsx src/scripts/migrateProductMerchandising.ts",
     "test": "tsx --test tests/*.test.ts",
-    "start": "node dist/local.js",
+    "start": "node dist/server.js",
     "seed:reviews": "tsx src/scripts/seedReviews.ts"
   },
   "dependencies": {
