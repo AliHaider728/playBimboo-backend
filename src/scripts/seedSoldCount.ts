@@ -6,8 +6,8 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const run = async () => {
   try {
-    const mongoUri = process.env.MONGO_URI;
-    if (!mongoUri) throw new Error('MONGO_URI is missing');
+    const mongoUri = process.env.MONGODB_URI;
+    if (!mongoUri) throw new Error('MONGODB_URI is missing');
     await mongoose.connect(mongoUri);
     console.log('Connected to DB');
 

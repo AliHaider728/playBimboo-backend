@@ -11,8 +11,8 @@ const DRY_RUN = process.argv.includes('--dry-run');
 async function runMigration() {
   console.log(`Starting Product Migration V2 ${DRY_RUN ? '(DRY RUN)' : '(LIVE RUN)'}`);
   
-  if (!process.env.MONGO_URI) {
-    console.error('MONGO_URI is missing');
+  if (!process.env.MONGODB_URI) {
+    console.error('MONGODB_URI is missing');
     process.exit(1);
   }
 
@@ -37,7 +37,7 @@ async function runMigration() {
   }
 
   try {
-    await mongoose.connect(process.env.MONGO_URI);
+    await mongoose.connect(process.env.MONGODB_URI);
     console.log('Connected to MongoDB');
 
     const products = await Product.find({});

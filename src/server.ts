@@ -150,8 +150,36 @@ if (typeof require !== 'undefined' && require.main === module) {
       // Port is likely free if command fails
     }
 
-    const server = app.listen(port, () => {
-      console.log(`PlayBimboo Backend API running on http://localhost:${port}`);
+    const server = app.listen(port, async () => {
+      try {
+        const mongoose = await connectToDatabase();
+        const db = mongoose.connection.db;
+        if (!db) throw new Error('Database not connected properly');
+        const dbName = db.databaseName;
+        
+        const [products, reviews, orders, categories, coupons, users] = await Promise.all([
+          db.collection('products').countDocuments(),
+          db.collection('reviews').countDocuments(),
+          db.collection('orders').countDocuments(),
+          db.collection('categories').countDocuments(),
+          db.collection('coupons').countDocuments(),
+          db.collection('users').countDocuments()
+        ]);
+
+        console.log('\n=========================================');
+        console.log('  PlayBimboo Backend API');
+        console.log(`  Status: RUNNING on http://localhost:${port}`);
+        console.log(`  Database: CONNECTED (${dbName})`);
+        console.log(`  Products: ${products} | Reviews: ${reviews} | Orders: ${orders}`);
+        console.log(`  Categories: ${categories} | Coupons: ${coupons} | Users: ${users}`);
+        console.log('=========================================\n');
+      } catch (err) {
+        console.log('\n=========================================');
+        console.log('  PlayBimboo Backend API');
+        console.log(`  Status: RUNNING on http://localhost:${port}`);
+        console.log('  Database: DISCONNECTED (Error connecting)');
+        console.log('=========================================\n');
+      }
     });
 
     server.on('error', (error: any) => {

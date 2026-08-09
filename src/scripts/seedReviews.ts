@@ -5,10 +5,10 @@ import Product from '../models/Product.js';
 
 dotenv.config();
 
-const MONGODB_URI = process.env.MONGO_URI || process.env.MONGODB_URI;
+const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGODB_URI;
 
 if (!MONGODB_URI) {
-  console.error('MONGO_URI is not defined in environment variables.');
+  console.error('MONGODB_URI is not defined in environment variables.');
   process.exit(1);
 }
 

@@ -10,8 +10,8 @@ dotenv.config({ path: path.join(process.cwd(), '.env') });
 const applyChanges = process.argv.includes('--apply');
 
 const run = async () => {
-  if (!process.env.MONGO_URI) throw new Error('MONGO_URI is missing');
-  await mongoose.connect(process.env.MONGO_URI);
+  if (!process.env.MONGODB_URI) throw new Error('MONGODB_URI is missing');
+  await mongoose.connect(process.env.MONGODB_URI);
   const [products, categories] = await Promise.all([
     Product.find({}).sort({ updatedAt: -1 }).lean(),
     Category.find({}).lean()

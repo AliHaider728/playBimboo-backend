@@ -4,7 +4,7 @@ import path from 'path';
 
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
-const MONGODB_URI = process.env.MONGO_URI || process.env.MONGODB_URI;
+const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGODB_URI;
 
 if (!MONGODB_URI) {
   console.error('MONGODB_URI is not defined in environment variables.');

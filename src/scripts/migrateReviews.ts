@@ -8,7 +8,7 @@ import Review from '../models/Review.js';
 
 const migrateReviews = async () => {
   console.log('Connecting to MongoDB...');
-  await mongoose.connect(process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://localhost:27017/playbimboo');
+  await mongoose.connect(process.env.MONGODB_URI || process.env.MONGODB_URI || 'mongodb://localhost:27017/playbimboo');
   
   console.log('Fetching all reviews...');
   const reviews = await Review.find({});
