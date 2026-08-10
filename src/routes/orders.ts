@@ -6,6 +6,7 @@ import Settings from '../models/Settings.js';
 import User from '../models/User.js';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
+import { sendMetaPurchase } from '../lib/metaConversionsApi.js';
 import {
   getEmailFailureCode,
   sendOrderConfirmationEmail,
@@ -432,6 +433,24 @@ router.post('/', async (req: Request, res: Response) => {
     // The order remains valid if SMTP fails; only a sanitized failure state is persisted.
     await sendAndTrackOrderConfirmation(newOrder);
     await sendAndTrackAdminNewOrderNotification(newOrder);
+   // Meta Conversions API
+const metaEventId = `purchase_${newOrder.orderId}`;
+
+try {
+  await sendMetaPurchase({
+    order: newOrder,
+    req,
+    eventId: metaEventId,
+  });
+} catch (error) {
+  // Meta tracking failure must NEVER cause the customer's
+  // successfully-created order to fail.
+  console.error(
+    `[Meta CAPI] Could not track order ${newOrder.orderId}:`,
+    error
+  );
+}
+
 
     res.status(201).json(newOrder);
   } catch (err: any) {
