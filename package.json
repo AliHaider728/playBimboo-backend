@@ -4,7 +4,7 @@
   "description": "Express + MongoDB API Backend for PlayBimboo Toy Store E-Commerce",
   "main": "dist/server.js",
   "engines": {
-    "node": "24.x"
+    "node": ">=18"
   },
   "scripts": {
     "dev": "tsx src/server.ts",
@@ -12,7 +12,7 @@
     "backfill:product-thumbnails": "tsx src/scripts/backfillProductThumbnails.ts",
     "migrate:product-merchandising": "tsx src/scripts/migrateProductMerchandising.ts",
     "test": "tsx --test tests/*.test.ts",
-    "start": "node dist/server.js",
+    "start": "node app.js",
     "seed:reviews": "tsx src/scripts/seedReviews.ts"
   },
   "dependencies": {
