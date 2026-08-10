@@ -192,7 +192,7 @@ export const buildOrderDeliveredEmail = (order: any): EmailContent => {
 export const sendOrderDeliveredEmail = (order: any) =>
   sendEmail(String(order.email || ''), buildOrderDeliveredEmail(order));
 
-export const buildOrderConfirmationEmail = (order: any): EmailContent => {
+export const buildOrderConfirmationEmail = (order: any, options?: { isNewAccount?: boolean; rawPassword?: string }): EmailContent => {
   const items = Array.isArray(order.items) ? order.items : [];
   const itemLines = items.map((item: any) => {
     const quantity = Math.max(1, Number(item.quantity) || 1);
@@ -255,6 +255,7 @@ export const buildOrderConfirmationEmail = (order: any): EmailContent => {
             <tr><td style="padding:10px 0 0;color:#0f172a;font-size:17px;font-weight:800;">Final total</td><td style="padding:10px 0 0;text-align:right;color:#e11d48;font-size:19px;font-weight:900;">${formatPkr(order.total)}</td></tr>
           </table>
           <div style="background:#f8fafc;border-radius:14px;padding:16px;margin-bottom:22px;"><h3 style="color:#0f172a;font-size:16px;margin:0 0 8px;">Delivery address</h3><p style="margin:0;line-height:1.6;color:#334155;"><strong>${escapeHtml(address.fullName || customerName)}</strong><br/>${escapeHtml(fullAddress)}${contactPhone ? `<br/>Phone: ${escapeHtml(contactPhone)}` : ''}</p></div>
+          ${options?.isNewAccount ? `<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:14px;padding:16px;margin-bottom:22px;"><h3 style="color:#b45309;font-size:16px;margin:0 0 8px;">Your account has been created</h3><p style="margin:0 0 12px;line-height:1.6;color:#92400e;">We've automatically created an account for you to track your order.</p><p style="margin:0 0 4px;color:#92400e;"><strong>Email:</strong> ${escapeHtml(String(order.email || ''))}</p><p style="margin:0 0 16px;color:#92400e;"><strong>Password:</strong> ${escapeHtml(options.rawPassword || '')}</p><a href="${process.env.FRONTEND_URL || 'https://play-bimboo.vercel.app'}/login" style="display:inline-block;background:#d97706;color:#ffffff;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:bold;">Track Your Order</a><p style="margin:12px 0 0;font-size:12px;color:#92400e;">You can change this password anytime from your profile.</p></div>` : (options?.isNewAccount === false ? `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;padding:16px;margin-bottom:22px;"><h3 style="color:#15803d;font-size:16px;margin:0 0 8px;">Track your order</h3><p style="margin:0 0 12px;line-height:1.6;color:#166534;">You already have an account with us. Log in with your existing credentials to track this order.</p><a href="${process.env.FRONTEND_URL || 'https://play-bimboo.vercel.app'}/login" style="display:inline-block;background:#15803d;color:#ffffff;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:bold;">Log In to Track Order</a></div>` : '')}
           <p style="line-height:1.6;margin:0 0 12px;">Questions about your order? Reply to this email or contact <a href="mailto:sales@playbimboo.com" style="color:#e11d48;">sales@playbimboo.com</a>.</p><p style="line-height:1.6;margin:0;">Thank you for choosing PlayBimboo!</p>
         </td></tr>
         <tr><td style="background:#f8fafc;padding:18px 28px;text-align:center;color:#94a3b8;font-size:12px;">PlayBimboo Toys &middot; Customer Support: sales@playbimboo.com</td></tr>
@@ -269,14 +270,26 @@ export const buildOrderConfirmationEmail = (order: any): EmailContent => {
     ...(discount > 0 ? [`Discount: -${formatPkr(discount)}`] : []),
     `Final total: ${formatPkr(order.total)}`,
     `Delivery address: ${String(address.fullName || customerName)}, ${fullAddress}${contactPhone ? `, Phone: ${contactPhone}` : ''}`,
+    ...(options?.isNewAccount ? [
+      '--- YOUR NEW ACCOUNT ---',
+      'We auto-created an account for you so you can track this order.',
+      `Email: ${String(order.email || '')}`,
+      `Password: ${options.rawPassword || ''}`,
+      'Log in at our website to track your order. You can change your password anytime.',
+      '-------------------------'
+    ] : (options?.isNewAccount === false ? [
+      '--- TRACK YOUR ORDER ---',
+      'You already have an account with us. Log in with your existing credentials to track this order.',
+      '------------------------'
+    ] : [])),
     'Our team will contact you to confirm the order before it is dispatched.',
     'Need help? Reply to this email or contact sales@playbimboo.com.'
   ].join('\n\n');
   return { subject, html, text };
 };
 
-export const sendOrderConfirmationEmail = (order: any) =>
-  sendEmail(String(order.email || ''), buildOrderConfirmationEmail(order));
+export const sendOrderConfirmationEmail = (order: any, options?: { isNewAccount?: boolean; rawPassword?: string }) =>
+  sendEmail(String(order.email || ''), buildOrderConfirmationEmail(order, options));
 
 export const sendOrderStatusEmail = async (order: any) => {
   const content: EmailContent = {

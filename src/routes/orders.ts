@@ -25,11 +25,11 @@ const logEmailFailure = (kind: string, orderId: string, error: unknown) => {
   console.error(`${kind} email failed for order ${orderId} (${getEmailFailureCode(error)}).`);
 };
 
-const sendAndTrackOrderConfirmation = async (order: any) => {
+const sendAndTrackOrderConfirmation = async (order: any, options?: { isNewAccount?: boolean; rawPassword?: string }) => {
   if (order.confirmationEmailSentAt) return;
   if (!String(order.email || '').trim()) return;
   try {
-    const confirmation = await sendOrderConfirmationEmail(order);
+    const confirmation = await sendOrderConfirmationEmail(order, options);
     order.confirmationEmailSentAt = new Date();
     order.confirmationEmailMessageId = confirmation.messageId;
     order.confirmationEmailAccepted = confirmation.acceptedCount > 0;
@@ -362,12 +362,16 @@ router.post('/', async (req: Request, res: Response) => {
 
     // Account creation / reuse logic
     let orderUserId;
+    let isNewAccount = false;
+    let generatedPassword = '';
+    
     if (normalizedEmail) {
       let user = await User.findOne({ email: normalizedEmail });
       if (!user) {
+        isNewAccount = true;
         const token = crypto.randomBytes(20).toString('hex');
-        const rawPassword = crypto.randomBytes(12).toString('hex');
-        const passwordHash = await bcrypt.hash(rawPassword, 10);
+        generatedPassword = crypto.randomBytes(12).toString('hex');
+        const passwordHash = await bcrypt.hash(generatedPassword, 10);
         user = new User({
           name: customerName || normalizedEmail.split('@')[0],
           email: normalizedEmail,
@@ -378,6 +382,8 @@ router.post('/', async (req: Request, res: Response) => {
         });
         await user.save();
         await sendAccountActivationEmail(user, token).catch(err => console.error('Failed to send activation email:', err));
+      } else {
+        isNewAccount = false;
       }
       orderUserId = user._id;
     }
@@ -431,7 +437,10 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     // The order remains valid if SMTP fails; only a sanitized failure state is persisted.
-    await sendAndTrackOrderConfirmation(newOrder);
+    await sendAndTrackOrderConfirmation(newOrder, {
+      isNewAccount: isNewAccount,
+      rawPassword: generatedPassword || undefined
+    });
     await sendAndTrackAdminNewOrderNotification(newOrder);
    // Meta Conversions API
 const metaEventId = `purchase_${newOrder.orderId}`;
