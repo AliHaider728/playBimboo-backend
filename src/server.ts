@@ -120,34 +120,55 @@ app.use('/api/contact', requireDatabaseConnection, contactRoutes);
 
 export default app;
 
+// cPanel/Passenger expects module.exports, not TypeScript's exports.default.
+if (typeof module !== 'undefined') {
+  module.exports = app;
+}
+
+const isPassengerRuntime = Boolean(
+  process.env.PASSENGER_APP_ENV || process.env.PASSENGER_BASE_URI
+);
+
 // If not running in a serverless environment (e.g. running directly via node/tsx)
-if (typeof require !== 'undefined' && require.main === module) {
+if (
+  typeof require !== 'undefined' &&
+  require.main === module &&
+  !isPassengerRuntime
+) {
   const port = Number.parseInt(process.env.PORT ?? '5000', 10);
 
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Error('PORT must be an integer between 1 and 65535');
   }
 
+  // Managed runtimes (cPanel/Passenger, PaaS) assign the port themselves and
+  // run many apps per host, so a "port in use" reading there is meaningless —
+  // and exiting on it means the app never listens and the vhost serves 503.
+  const isManagedRuntime =
+    process.env.NODE_ENV === 'production' || Boolean(process.env.PASSENGER_BASE_URI);
+
   async function checkPortAndStart() {
-    try {
-      const { stdout } = await execAsync(
-        process.platform === 'win32' 
-          ? `netstat -ano | findstr :${port}`
-          : `lsof -i :${port} | grep LISTEN`
-      );
-      
-      if (stdout.trim()) {
-        const match = process.platform === 'win32' 
-          ? stdout.trim().match(/LISTENING\s+(\d+)/i)
-          : stdout.trim().match(/\s+(\d+)\s+/);
-          
-        const pid = match ? match[1] : 'Unknown';
-        console.error(`\n🚨 ERROR: Port ${port} is already in use.`);
-        console.error(`The backend may already be running. Check PID ${pid} before starting another instance.\n`);
-        process.exit(1);
+    if (!isManagedRuntime) {
+      try {
+        const { stdout } = await execAsync(
+          process.platform === 'win32'
+            ? `netstat -ano | findstr :${port}`
+            : `lsof -i :${port} | grep LISTEN`
+        );
+
+        if (stdout.trim()) {
+          const match = process.platform === 'win32'
+            ? stdout.trim().match(/LISTENING\s+(\d+)/i)
+            : stdout.trim().match(/\s+(\d+)\s+/);
+
+          const pid = match ? match[1] : 'Unknown';
+          console.error(`\n🚨 ERROR: Port ${port} is already in use.`);
+          console.error(`The backend may already be running. Check PID ${pid} before starting another instance.\n`);
+          process.exit(1);
+        }
+      } catch (err) {
+        // Port is likely free if command fails
       }
-    } catch (err) {
-      // Port is likely free if command fails
     }
 
     const server = app.listen(port, async () => {
@@ -156,7 +177,7 @@ if (typeof require !== 'undefined' && require.main === module) {
         const db = mongoose.connection.db;
         if (!db) throw new Error('Database not connected properly');
         const dbName = db.databaseName;
-        
+
         const [products, reviews, orders, categories, coupons, users] = await Promise.all([
           db.collection('products').countDocuments(),
           db.collection('reviews').countDocuments(),
