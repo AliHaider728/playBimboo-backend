@@ -6,6 +6,7 @@ import Settings from '../models/Settings.js';
 import User from '../models/User.js';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import { sendMetaPurchase } from '../lib/metaConversionsApi.js';
 import {
   getEmailFailureCode,
@@ -362,6 +363,7 @@ router.post('/', async (req: Request, res: Response) => {
 
     // Account creation / reuse logic
     let orderUserId;
+    let orderUser;
     let isNewAccount = false;
     let generatedPassword = '';
     
@@ -386,6 +388,7 @@ router.post('/', async (req: Request, res: Response) => {
         isNewAccount = false;
       }
       orderUserId = user._id;
+      orderUser = user;
     }
 
     const newOrder = new Order({
@@ -461,7 +464,20 @@ try {
 }
 
 
-    res.status(201).json(newOrder);
+    if (isNewAccount && orderUser && process.env.JWT_SECRET) {
+      const token = jwt.sign(
+        { userId: orderUser._id, email: orderUser.email, role: orderUser.role },
+        process.env.JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+      res.status(201).json({
+        order: newOrder,
+        token,
+        user: { id: orderUser._id, name: orderUser.name, email: orderUser.email, role: orderUser.role }
+      });
+    } else {
+      res.status(201).json(newOrder);
+    }
   } catch (err: any) {
     if (checkoutRequestId && err?.code === 11000) {
       const existingOrder = await Order.findOne({ checkoutRequestId });
