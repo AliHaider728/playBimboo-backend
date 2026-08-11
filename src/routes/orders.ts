@@ -209,6 +209,7 @@ router.post('/', async (req: Request, res: Response) => {
   const checkoutRequestId = typeof req.body?.checkoutRequestId === 'string'
     ? req.body.checkoutRequestId.trim()
     : '';
+  let createdUserId: any = null;
   try {
     const { customerName, email, phone, items, discountAmount, shippingAddress, appliedCoupon } = req.body;
 
@@ -383,6 +384,7 @@ router.post('/', async (req: Request, res: Response) => {
           resetPasswordExpires: new Date(Date.now() + 86400000) // 24 hours
         });
         await user.save();
+        createdUserId = user._id;
         await sendAccountActivationEmail(user, token).catch(err => console.error('Failed to send activation email:', err));
       } else {
         isNewAccount = false;
@@ -479,9 +481,16 @@ try {
       res.status(201).json(newOrder);
     }
   } catch (err: any) {
+    if (createdUserId) {
+      await User.findByIdAndDelete(createdUserId).catch(() => {});
+    }
     if (checkoutRequestId && err?.code === 11000) {
       const existingOrder = await Order.findOne({ checkoutRequestId });
-      if (existingOrder) return res.status(200).json(existingOrder);
+      if (existingOrder) {
+        // Double-submission fallback: if the user was literally just created in the first request, we still want to log them in if possible,
+        // but we don't have the generated password anymore. At the very least, return the existing order.
+        return res.status(200).json(existingOrder);
+      }
     }
     res.status(400).json({ error: err.message });
   }
