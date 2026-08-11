@@ -145,6 +145,7 @@ export const serializeProduct = (value: any, reviewSummary?: ReviewSummary) => {
   const product = typeof value?.toObject === 'function'
     ? value.toObject({ flattenMaps: true })
     : { ...value };
+  product.id = String(product._id || product.id || '');
   product.ageGroups = safelyNormalizeAgeGroups(product);
   delete product.ageGroup;
   try {
