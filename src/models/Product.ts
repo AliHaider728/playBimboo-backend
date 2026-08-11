@@ -121,6 +121,7 @@ export interface IProduct extends Document {
   productDetailCustomCss?: string;
   productDetailScopedCss?: string;
   sizeGuide?: string;
+  displayOrder?: number;
   productSchemaVersion?: number;
   createdAt: Date;
 }
