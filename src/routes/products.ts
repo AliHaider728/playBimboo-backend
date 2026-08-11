@@ -24,6 +24,24 @@ import { syncProductGlobalAttributes } from '../lib/globalAttributes.js';
 
 const router = Router();
 
+const triggerSitemapRevalidation = () => {
+  const secret = process.env.REVALIDATION_SECRET;
+  const frontendUrl = process.env.FRONTEND_URL || 'https://playbimboo.com';
+  if (!secret) {
+    console.warn('[Revalidation] REVALIDATION_SECRET is not set in backend environment variables.');
+    return;
+  }
+  const url = `${frontendUrl}/api/revalidate?secret=${secret}&path=/sitemap.xml`;
+  console.log(`[Revalidation] Calling webhook URL: ${url}`);
+  fetch(url)
+    .then(async (res) => {
+      console.log(`[Revalidation] Response status: ${res.status}`);
+      const text = await res.text();
+      console.log(`[Revalidation] Response body: ${text}`);
+    })
+    .catch(err => console.error('[Revalidation] Failed to trigger sitemap revalidation:', err.message));
+};
+
 // PUT Bulk Reorder Products (MUST be at the very top to prevent :id interception)
 router.put('/reorder', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
@@ -907,6 +925,7 @@ router.post('/', authenticateToken, requireAdmin, async (req: AuthRequest, res: 
     if (payload.isSpotlight) await Product.updateMany({ isSpotlight: true }, { $set: { isSpotlight: false } });
     const newProduct = new Product(payload);
     await newProduct.save();
+    triggerSitemapRevalidation();
     res.status(201).json((await serializeProducts([newProduct]))[0]);
   } catch (err: any) {
     const isConflict = err?.code === 11000 || /already used|unique/i.test(err.message);
@@ -946,6 +965,7 @@ router.put('/:id', authenticateToken, requireAdmin, async (req: AuthRequest, res
     if (removedPublicIds.length > 0) {
       await deleteImagesUnusedByOtherProducts(removedPublicIds, product.id);
     }
+    triggerSitemapRevalidation();
     res.json((await serializeProducts([product]))[0]);
   } catch (err: any) {
     const isConflict = err?.code === 11000 || /already used|unique/i.test(err.message);
@@ -968,6 +988,7 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req: Request, res:
     if (publicIds.length > 0) {
       await deleteImagesUnusedByOtherProducts(publicIds, product.id);
     }
+    triggerSitemapRevalidation();
     res.json({ message: 'Product deleted successfully' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

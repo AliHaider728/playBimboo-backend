@@ -596,4 +596,15 @@ router.put('/:orderId/tracking', authenticateToken, requireAdmin, async (req: Re
   }
 });
 
+// DELETE Order (Admin)
+router.delete('/:orderId', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const order = await Order.findOneAndDelete({ orderId: req.params.orderId });
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    res.json({ message: 'Order deleted successfully' });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 export default router;
