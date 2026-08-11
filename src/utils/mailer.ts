@@ -147,7 +147,7 @@ export const buildOrderDeliveredEmail = (order: any): EmailContent => {
         <tr><td align="center">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #e2e8f0;border-radius:20px;overflow:hidden;">
             <tr><td style="background:#0f172a;padding:28px;text-align:center;">
-              <img src="${process.env.FRONTEND_URL || 'https://play-bimboo.vercel.app'}/playbimbooLOGO.webp" alt="PlayBimboo" style="width:120px;height:auto;margin:0 auto 16px;display:block;" />
+              <img src="${process.env.FRONTEND_URL || 'https://play-bimboo.vercel.app'}/logo.jpg" alt="PlayBimboo" style="width:120px;height:auto;margin:0 auto 16px;display:block;" />
               <h1 style="color:#ffffff;font-size:26px;margin:0 0 4px;">PlayBimboo</h1>
               <p style="color:#cbd5e1;margin:0;font-size:14px;">Delivered with smiles</p>
             </td></tr>
@@ -233,7 +233,7 @@ export const buildOrderConfirmationEmail = (order: any, options?: { isNewAccount
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8fafc;padding:24px 12px;"><tr><td align="center">
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #e2e8f0;border-radius:20px;overflow:hidden;">
         <tr><td style="background:#0f172a;padding:28px;text-align:center;">
-          <img src="${process.env.FRONTEND_URL || 'https://play-bimboo.vercel.app'}/playbimbooLOGO.webp" alt="PlayBimboo" style="width:120px;height:auto;margin:0 auto 16px;display:block;" />
+          <img src="${process.env.FRONTEND_URL || 'https://play-bimboo.vercel.app'}/logo.jpg" alt="PlayBimboo" style="width:120px;height:auto;margin:0 auto 16px;display:block;" />
           <h1 style="color:#ffffff;font-size:26px;margin:0 0 4px;">PlayBimboo</h1><p style="color:#cbd5e1;margin:0;font-size:14px;">Happy playtime starts here</p>
         </td></tr>
         <tr><td style="padding:32px 28px;">
@@ -294,7 +294,7 @@ export const sendOrderConfirmationEmail = (order: any, options?: { isNewAccount?
 export const sendOrderStatusEmail = async (order: any) => {
   const content: EmailContent = {
     subject: `Order Update #${String(order.orderId || 'Order')} - ${String(order.status || 'Updated')}`,
-    html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:24px;border:1px solid #e2e8f0;border-radius:16px;"><img src="${process.env.FRONTEND_URL || 'https://play-bimboo.vercel.app'}/playbimbooLOGO.webp" alt="PlayBimboo" style="width:120px;height:auto;margin-bottom:20px;display:block;" /><h2 style="color:#f43f5e;">PlayBimboo Order Update</h2><p>Hi <strong>${escapeHtml(order.customerName || 'Customer')}</strong>,</p><p>Order <strong>#${escapeHtml(order.orderId || 'Order')}</strong> is now <strong>${escapeHtml(order.status || 'Updated')}</strong>.</p>${order.trackingNumber ? `<p>Tracking code: <strong>${escapeHtml(order.trackingNumber)}</strong></p>` : ''}<p>Support: sales@playbimboo.com</p></div>`,
+    html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:24px;border:1px solid #e2e8f0;border-radius:16px;"><img src="${process.env.FRONTEND_URL || 'https://play-bimboo.vercel.app'}/logo.jpg" alt="PlayBimboo" style="width:120px;height:auto;margin-bottom:20px;display:block;" /><h2 style="color:#f43f5e;">PlayBimboo Order Update</h2><p>Hi <strong>${escapeHtml(order.customerName || 'Customer')}</strong>,</p><p>Order <strong>#${escapeHtml(order.orderId || 'Order')}</strong> is now <strong>${escapeHtml(order.status || 'Updated')}</strong>.</p>${order.trackingNumber ? `<p>Tracking code: <strong>${escapeHtml(order.trackingNumber)}</strong></p>` : ''}<p>Support: sales@playbimboo.com</p></div>`,
     text: `PlayBimboo order #${String(order.orderId || 'Order')} is now ${String(order.status || 'Updated')}. Support: sales@playbimboo.com.`
   };
   return sendEmail(String(order.email || ''), content);
@@ -362,7 +362,7 @@ export const buildAdminNewOrderEmail = (order: any): EmailContent => {
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8fafc;padding:24px 12px;"><tr><td align="center">
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #e2e8f0;border-radius:20px;overflow:hidden;">
         <tr><td style="background:#0f172a;padding:28px;text-align:center;">
-          <img src="${process.env.FRONTEND_URL || 'https://play-bimboo.vercel.app'}/playbimbooLOGO.webp" alt="PlayBimboo" style="width:120px;height:auto;margin:0 auto 16px;display:block;" />
+          <img src="${process.env.FRONTEND_URL || 'https://play-bimboo.vercel.app'}/logo.jpg" alt="PlayBimboo" style="width:120px;height:auto;margin:0 auto 16px;display:block;" />
           <h1 style="color:#ffffff;font-size:24px;margin:0;">You've received a new order</h1>
         </td></tr>
         <tr><td style="padding:32px 28px;">
@@ -442,7 +442,7 @@ export const sendPasswordResetEmail = async (user: any, code: string) => {
   const subject = 'Reset your PlayBimboo password';
   const html = `
     <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#333;">
-      <img src="${process.env.FRONTEND_URL || 'https://play-bimboo.vercel.app'}/playbimbooLOGO.webp" alt="PlayBimboo" style="width:120px;height:auto;margin-bottom:20px;display:block;" />
+      <img src="${process.env.FRONTEND_URL || 'https://play-bimboo.vercel.app'}/logo.jpg" alt="PlayBimboo" style="width:120px;height:auto;margin-bottom:20px;display:block;" />
       <h2 style="color:#e11d48;">PlayBimboo Password Reset</h2>
       <p>Hello ${escapeHtml(user.name)},</p>
       <p>You recently requested to reset your password for your PlayBimboo account. Use the 6-digit verification code below to reset it.</p>
@@ -464,7 +464,7 @@ export const sendAccountActivationEmail = async (user: any, token: string) => {
   const subject = 'Activate Your PlayBimboo Account';
   const html = `
     <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#333;">
-      <img src="${process.env.FRONTEND_URL || 'https://play-bimboo.vercel.app'}/playbimbooLOGO.webp" alt="PlayBimboo" style="width:120px;height:auto;margin-bottom:20px;display:block;" />
+      <img src="${process.env.FRONTEND_URL || 'https://play-bimboo.vercel.app'}/logo.jpg" alt="PlayBimboo" style="width:120px;height:auto;margin-bottom:20px;display:block;" />
       <h2 style="color:#e11d48;">Welcome to PlayBimboo!</h2>
       <p>Hello ${escapeHtml(user.name)},</p>
       <p>Thank you for your recent order! We've created an account for you to easily track your orders and manage your wishlist.</p>
@@ -483,7 +483,7 @@ export const sendAccountActivationEmail = async (user: any, token: string) => {
 
 export const sendContactConfirmationEmail = async (email: string, name: string) => {
   const subject = 'Thank you for contacting PlayBimboo';
-  const html = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;"><img src="${process.env.FRONTEND_URL || 'https://play-bimboo.vercel.app'}/playbimbooLOGO.webp" alt="PlayBimboo" style="width:120px;height:auto;margin-bottom:20px;display:block;" /><h1>Hello ${name},</h1><p>Thank you for your enquiry. We have received your message and will contact you as soon as possible.</p><br/><p>Best regards,<br/>The PlayBimboo Team</p></div>`;
+  const html = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;"><img src="${process.env.FRONTEND_URL || 'https://play-bimboo.vercel.app'}/logo.jpg" alt="PlayBimboo" style="width:120px;height:auto;margin-bottom:20px;display:block;" /><h1>Hello ${name},</h1><p>Thank you for your enquiry. We have received your message and will contact you as soon as possible.</p><br/><p>Best regards,<br/>The PlayBimboo Team</p></div>`;
   const text = `Hello ${name},\n\nThank you for your enquiry. We have received your message and will contact you as soon as possible.\n\nBest regards,\nThe PlayBimboo Team`;
   return sendEmail(email, { subject, html, text });
 };
