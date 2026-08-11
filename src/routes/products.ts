@@ -24,6 +24,31 @@ import { syncProductGlobalAttributes } from '../lib/globalAttributes.js';
 
 const router = Router();
 
+// PUT Bulk Reorder Products (MUST be at the very top to prevent :id interception)
+router.put('/reorder', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    const updates = req.body as { id: string, displayOrder: number }[];
+    if (!Array.isArray(updates)) {
+      return res.status(400).json({ error: 'Expected an array of updates' });
+    }
+    
+    const bulkOps = updates.map(update => ({
+      updateOne: {
+        filter: { _id: update.id },
+        update: { $set: { displayOrder: update.displayOrder } }
+      }
+    }));
+    
+    if (bulkOps.length > 0) {
+      await Product.bulkWrite(bulkOps);
+    }
+    
+    res.json({ success: true, message: 'Products reordered successfully' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // TEMPORARY SEED ROUTE
 router.get('/seed-sold-count', async (req, res) => {
   try {
@@ -699,7 +724,7 @@ router.get('/', authenticateIfPresent, async (req: AuthRequest, res: Response) =
       ];
     }
 
-    let query = Product.find(filter).sort({ createdAt: -1 });
+    let query = Product.find(filter).sort({ displayOrder: 1, createdAt: -1 });
     if (limit) {
       query = query.limit(Number(limit));
     }
@@ -868,6 +893,7 @@ router.get('/:idOrSlug', authenticateIfPresent, async (req: AuthRequest, res: Re
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // POST Create Product
 router.post('/', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {

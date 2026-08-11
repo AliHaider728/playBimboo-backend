@@ -63,6 +63,7 @@ export const authenticateIfPresent = (req: AuthRequest, res: Response, next: Nex
 };
 
 export const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
+  console.log('[requireAdmin] Path:', req.originalUrl, 'Method:', req.method, 'User:', req.user);
   if (!req.user || !['admin', 'super_admin'].includes(req.user.role)) {
     return res.status(403).json({ error: 'Access denied. Admin privileges required.' });
   }

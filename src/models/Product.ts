@@ -253,6 +253,7 @@ const ProductSchema = new Schema<IProduct>(
     description: { type: String },
     isVisible: { type: Boolean, default: true },
     status: { type: String, enum: ['draft', 'published'], default: 'published' },
+    displayOrder: { type: Number, default: 0 },
     isFeatured: { type: Boolean, default: false },
     isBestseller: { type: Boolean, default: false },
     isNewArrival: { type: Boolean, default: false },

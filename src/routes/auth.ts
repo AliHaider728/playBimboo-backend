@@ -61,6 +61,7 @@ router.post('/login', async (req: Request, res: Response) => {
       jwtSecret,
       { expiresIn: '7d' }
     );
+    console.log('[login] Signing JWT with role:', user.role, 'User:', user.email);
 
     const isProduction = process.env.NODE_ENV === 'production';
     res.cookie('pb_admin_token', token, {
