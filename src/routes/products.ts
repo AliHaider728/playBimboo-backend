@@ -32,7 +32,7 @@ const triggerSitemapRevalidation = () => {
     return;
   }
   const url = `${frontendUrl}/api/revalidate?secret=${secret}&path=/sitemap.xml`;
-  console.log(`[Revalidation] Calling webhook URL: ${url}`);
+  console.log(`[Revalidation] Calling webhook URL: ${frontendUrl}/api/revalidate?secret=***&path=/sitemap.xml`);
   fetch(url)
     .then(async (res) => {
       console.log(`[Revalidation] Response status: ${res.status}`);
