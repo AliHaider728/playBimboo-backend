@@ -146,10 +146,9 @@ export const buildOrderDeliveredEmail = (order: any): EmailContent => {
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8fafc;padding:24px 12px;">
         <tr><td align="center">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #e2e8f0;border-radius:20px;overflow:hidden;">
-            <tr><td style="background:#0f172a;padding:28px;text-align:center;">
-              <img src="https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786520001/playbimbooLOGO_t6zqit.webp" alt="PlayBimboo" style="width:120px;height:auto;margin:0 auto 16px;display:block;" />
-              <h1 style="color:#ffffff;font-size:26px;margin:0 0 4px;">PlayBimboo</h1>
-              <p style="color:#cbd5e1;margin:0;font-size:14px;">Delivered with smiles</p>
+            <tr><td style="background:#ffffff;padding:36px 28px 24px;text-align:center;border-bottom:1px solid #f1f5f9;">
+              <img src="https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786520001/playbimbooLOGO_t6zqit.webp" alt="PlayBimboo" style="width:180px;height:auto;margin:0 auto 12px;display:block;" />
+              <p style="color:#64748b;margin:0;font-size:15px;font-weight:500;letter-spacing:0.5px;">Delivered with smiles</p>
             </td></tr>
             <tr><td style="padding:32px 28px;">
               <h2 style="color:#0f172a;font-size:24px;margin:0 0 16px;">Your order has been delivered!</h2>
@@ -232,9 +231,9 @@ export const buildOrderConfirmationEmail = (order: any, options?: { isNewAccount
   <html lang="en"><body style="margin:0;background:#f8fafc;font-family:Arial,sans-serif;color:#334155;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8fafc;padding:24px 12px;"><tr><td align="center">
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #e2e8f0;border-radius:20px;overflow:hidden;">
-        <tr><td style="background:#0f172a;padding:28px;text-align:center;">
-          <img src="https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786520001/playbimbooLOGO_t6zqit.webp" alt="PlayBimboo" style="width:120px;height:auto;margin:0 auto 16px;display:block;" />
-          <h1 style="color:#ffffff;font-size:26px;margin:0 0 4px;">PlayBimboo</h1><p style="color:#cbd5e1;margin:0;font-size:14px;">Happy playtime starts here</p>
+        <tr><td style="background:#ffffff;padding:36px 28px 24px;text-align:center;border-bottom:1px solid #f1f5f9;">
+          <img src="https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786520001/playbimbooLOGO_t6zqit.webp" alt="PlayBimboo" style="width:180px;height:auto;margin:0 auto 12px;display:block;" />
+          <p style="color:#64748b;margin:0;font-size:15px;font-weight:500;letter-spacing:0.5px;">Happy playtime starts here</p>
         </td></tr>
         <tr><td style="padding:32px 28px;">
           <h2 style="color:#0f172a;font-size:24px;margin:0 0 16px;">Your order is confirmed!</h2>
@@ -293,7 +292,7 @@ export const sendOrderConfirmationEmail = (order: any, options?: { isNewAccount?
 export const sendOrderStatusEmail = async (order: any) => {
   const content: EmailContent = {
     subject: `Order Update #${String(order.orderId || 'Order')} - ${String(order.status || 'Updated')}`,
-    html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:24px;border:1px solid #e2e8f0;border-radius:16px;"><img src="https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786520001/playbimbooLOGO_t6zqit.webp" alt="PlayBimboo" style="width:120px;height:auto;margin-bottom:20px;display:block;" /><h2 style="color:#f43f5e;">PlayBimboo Order Update</h2><p>Hi <strong>${escapeHtml(order.customerName || 'Customer')}</strong>,</p><p>Order <strong>#${escapeHtml(order.orderId || 'Order')}</strong> is now <strong>${escapeHtml(order.status || 'Updated')}</strong>.</p>${order.trackingNumber ? `<p>Tracking code: <strong>${escapeHtml(order.trackingNumber)}</strong></p>` : ''}<p>Support: sales@playbimboo.com</p></div>`,
+    html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:32px 24px;border:1px solid #e2e8f0;border-radius:16px;"><img src="https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786520001/playbimbooLOGO_t6zqit.webp" alt="PlayBimboo" style="width:180px;height:auto;margin:0 auto 24px;display:block;" /><h2 style="color:#0f172a;text-align:center;margin:0 0 24px;">Order Update</h2><p>Hi <strong>${escapeHtml(order.customerName || 'Customer')}</strong>,</p><p>Order <strong>#${escapeHtml(order.orderId || 'Order')}</strong> is now <strong>${escapeHtml(order.status || 'Updated')}</strong>.</p>${order.trackingNumber ? `<p>Tracking code: <strong>${escapeHtml(order.trackingNumber)}</strong></p>` : ''}<br/><p>Support: <a href="mailto:sales@playbimboo.com" style="color:#e11d48;">sales@playbimboo.com</a></p></div>`,
     text: `PlayBimboo order #${String(order.orderId || 'Order')} is now ${String(order.status || 'Updated')}. Support: sales@playbimboo.com.`
   };
   return sendEmail(String(order.email || ''), content);
@@ -360,9 +359,9 @@ export const buildAdminNewOrderEmail = (order: any): EmailContent => {
   <html lang="en"><body style="margin:0;background:#f8fafc;font-family:Arial,sans-serif;color:#334155;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8fafc;padding:24px 12px;"><tr><td align="center">
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #e2e8f0;border-radius:20px;overflow:hidden;">
-        <tr><td style="background:#0f172a;padding:28px;text-align:center;">
-          <img src="https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786520001/playbimbooLOGO_t6zqit.webp" alt="PlayBimboo" style="width:120px;height:auto;margin:0 auto 16px;display:block;" />
-          <h1 style="color:#ffffff;font-size:24px;margin:0;">You've received a new order</h1>
+        <tr><td style="background:#ffffff;padding:36px 28px 24px;text-align:center;border-bottom:1px solid #f1f5f9;">
+          <img src="https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786520001/playbimbooLOGO_t6zqit.webp" alt="PlayBimboo" style="width:180px;height:auto;margin:0 auto 16px;display:block;" />
+          <h1 style="color:#0f172a;font-size:22px;margin:0;">You've received a new order</h1>
         </td></tr>
         <tr><td style="padding:32px 28px;">
           <h3 style="color:#0f172a;font-size:16px;margin:0 0 8px;">Order summary</h3>
@@ -440,9 +439,9 @@ export const sendAdminNewOrderEmail = async (order: any, recipients: string[]) =
 export const sendPasswordResetEmail = async (user: any, code: string) => {
   const subject = 'Reset your PlayBimboo password';
   const html = `
-    <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#333;">
-      <img src="https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786520001/playbimbooLOGO_t6zqit.webp" alt="PlayBimboo" style="width:120px;height:auto;margin-bottom:20px;display:block;" />
-      <h2 style="color:#e11d48;">PlayBimboo Password Reset</h2>
+    <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#333;border:1px solid #e2e8f0;border-radius:16px;padding:32px 24px;">
+      <img src="https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786520001/playbimbooLOGO_t6zqit.webp" alt="PlayBimboo" style="width:180px;height:auto;margin:0 auto 24px;display:block;" />
+      <h2 style="color:#0f172a;text-align:center;margin-top:0;">Password Reset</h2>
       <p>Hello ${escapeHtml(user.name)},</p>
       <p>You recently requested to reset your password for your PlayBimboo account. Use the 6-digit verification code below to reset it.</p>
       <div style="margin: 30px 0; text-align: center;">
@@ -462,9 +461,9 @@ export const sendAccountActivationEmail = async (user: any, token: string) => {
   const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}&activate=1`;
   const subject = 'Activate Your PlayBimboo Account';
   const html = `
-    <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#333;">
-      <img src="https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786520001/playbimbooLOGO_t6zqit.webp" alt="PlayBimboo" style="width:120px;height:auto;margin-bottom:20px;display:block;" />
-      <h2 style="color:#e11d48;">Welcome to PlayBimboo!</h2>
+    <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#333;border:1px solid #e2e8f0;border-radius:16px;padding:32px 24px;">
+      <img src="https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786520001/playbimbooLOGO_t6zqit.webp" alt="PlayBimboo" style="width:180px;height:auto;margin:0 auto 24px;display:block;" />
+      <h2 style="color:#0f172a;text-align:center;margin-top:0;">Welcome!</h2>
       <p>Hello ${escapeHtml(user.name)},</p>
       <p>Thank you for your recent order! We've created an account for you to easily track your orders and manage your wishlist.</p>
       <p>Please click the button below to set your password and activate your account.</p>
@@ -482,7 +481,7 @@ export const sendAccountActivationEmail = async (user: any, token: string) => {
 
 export const sendContactConfirmationEmail = async (email: string, name: string) => {
   const subject = 'Thank you for contacting PlayBimboo';
-  const html = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;"><img src="https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786520001/playbimbooLOGO_t6zqit.webp" alt="PlayBimboo" style="width:120px;height:auto;margin-bottom:20px;display:block;" /><h1>Hello ${name},</h1><p>Thank you for your enquiry. We have received your message and will contact you as soon as possible.</p><br/><p>Best regards,<br/>The PlayBimboo Team</p></div>`;
+  const html = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;border:1px solid #e2e8f0;border-radius:16px;padding:32px 24px;"><img src="https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786520001/playbimbooLOGO_t6zqit.webp" alt="PlayBimboo" style="width:180px;height:auto;margin:0 auto 24px;display:block;" /><h1 style="color:#0f172a;text-align:center;font-size:24px;margin-top:0;">Hello ${name},</h1><p>Thank you for your enquiry. We have received your message and will contact you as soon as possible.</p><br/><p>Best regards,<br/>The PlayBimboo Team</p></div>`;
   const text = `Hello ${name},\n\nThank you for your enquiry. We have received your message and will contact you as soon as possible.\n\nBest regards,\nThe PlayBimboo Team`;
   return sendEmail(email, { subject, html, text });
 };
