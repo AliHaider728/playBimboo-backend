@@ -38,9 +38,18 @@ export interface Bogo {
   label: string;
 }
 
+export interface FlatDiscount {
+  enabled: boolean;
+  minQty: number;
+  discountType: "fixed" | "percentage";
+  discountValue: number;
+  label: string;
+}
+
 export interface PricingOffers {
   quantityBreaks?: QuantityBreaks;
   bogo?: Bogo;
+  flatDiscount?: FlatDiscount;
 }
 
 export interface CartLineResult {
@@ -79,14 +88,44 @@ export const resolveCartLine = (
   if (qb?.enabled && Array.isArray(qb.tiers) && qb.tiers.length > 0) {
     // Sort descending by minQty so we pick the highest qualifying tier
     const sortedTiers = [...qb.tiers].sort((a, b) => b.minQty - a.minQty);
+    const tier1Price = sortedTiers[sortedTiers.length - 1]?.pricePerUnit ?? baseUnitPrice;
+    
     const matchedTier = sortedTiers.find(tier => quantity >= tier.minQty);
     if (matchedTier) {
       unitPrice = matchedTier.pricePerUnit;
-      labels.push(matchedTier.label);
+      
+      const savePct = matchedTier.pricePerUnit < tier1Price ? 1 : 0;
+      const savedAmount = (tier1Price - matchedTier.pricePerUnit) * matchedTier.minQty;
+      
+      const autoLabel = savePct > 0 
+        ? `Buy ${matchedTier.minQty}, Save Rs. ${savedAmount}` 
+        : `Buy ${matchedTier.minQty}`;
+        
+      labels.push(matchedTier.label || autoLabel);
+    }
+  } else {
+    // 2. Flat Discount logic (only applies if Quantity Breaks didn't match a tier)
+    const flat = pricingOffers?.flatDiscount;
+    if (flat?.enabled && quantity >= flat.minQty) {
+      if (flat.discountType === 'percentage') {
+        const discountAmount = baseUnitPrice * (flat.discountValue / 100);
+        unitPrice = Math.max(0, baseUnitPrice - discountAmount);
+      } else {
+        unitPrice = Math.max(0, baseUnitPrice - flat.discountValue);
+      }
+
+      const flatSavedAmount = baseUnitPrice - unitPrice;
+      const flatAutoLabel = flat.discountType === 'percentage'
+        ? `Buy ${flat.minQty}+, Save ${flat.discountValue}%/unit`
+        : `Buy ${flat.minQty}+, Save Rs. ${flatSavedAmount}/unit`;
+
+      if (flatSavedAmount > 0) {
+        labels.push(flat.label || flatAutoLabel);
+      }
     }
   }
 
-  // ── 2. BOGO ───────────────────────────────────────────────────────────────
+  // ── 3. BOGO ───────────────────────────────────────────────────────────────
   const bogo = pricingOffers?.bogo;
   if (bogo?.enabled && bogo.buyQty >= 1 && bogo.getQty >= 1) {
     // Repeat the offer: floor(quantity / buyQty) × getQty

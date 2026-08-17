@@ -87,9 +87,18 @@ export interface IBogo {
   label: string;
 }
 
+export interface IFlatDiscount {
+  enabled: boolean;
+  minQty: number;
+  discountType: 'fixed' | 'percentage';
+  discountValue: number;
+  label: string;
+}
+
 export interface IPricingOffers {
   quantityBreaks: IQuantityBreaks;
   bogo: IBogo;
+  flatDiscount: IFlatDiscount;
 }
 
 export interface IProduct extends Document {
@@ -367,6 +376,13 @@ const ProductSchema = new Schema<IProduct>(
         // buyQty > getQty is enforced in normalizeProductPayload before this point
         buyQty: { type: Number, default: 2, min: 1 },
         getQty: { type: Number, default: 1, min: 1 },
+        label: { type: String, default: '', maxlength: 120 }
+      },
+      flatDiscount: {
+        enabled: { type: Boolean, default: false },
+        minQty: { type: Number, default: 2, min: 1 },
+        discountType: { type: String, enum: ["fixed", "percentage"], default: "fixed" },
+        discountValue: { type: Number, default: 0, min: 0 },
         label: { type: String, default: '', maxlength: 120 }
       }
     }
