@@ -85,6 +85,8 @@ export const resolveCartLine = (
 
   // ── 1. Quantity Breaks ────────────────────────────────────────────────────
   const qb = pricingOffers?.quantityBreaks;
+  let qbMatched = false;
+  
   if (qb?.enabled && Array.isArray(qb.tiers) && qb.tiers.length > 0) {
     // Sort descending by minQty so we pick the highest qualifying tier
     const sortedTiers = [...qb.tiers].sort((a, b) => b.minQty - a.minQty);
@@ -92,6 +94,7 @@ export const resolveCartLine = (
     
     const matchedTier = sortedTiers.find(tier => quantity >= tier.minQty);
     if (matchedTier) {
+      qbMatched = true;
       unitPrice = matchedTier.pricePerUnit;
       
       const savePct = matchedTier.pricePerUnit < tier1Price ? 1 : 0;
@@ -103,7 +106,9 @@ export const resolveCartLine = (
         
       labels.push(matchedTier.label || autoLabel);
     }
-  } else {
+  }
+  
+  if (!qbMatched) {
     // 2. Flat Discount logic (only applies if Quantity Breaks didn't match a tier)
     const flat = pricingOffers?.flatDiscount;
     if (flat?.enabled && quantity >= flat.minQty) {
