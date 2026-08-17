@@ -21,6 +21,8 @@ import {
 import { normalizeInventory } from '../lib/inventory.js';
 import { getApprovedReviewSummaries, ReviewSummary } from '../lib/productReviews.js';
 import { syncProductGlobalAttributes } from '../lib/globalAttributes.js';
+import type { PricingOffers } from '../lib/pricingOffers.js';
+
 
 const router = Router();
 
@@ -191,6 +193,15 @@ export const serializeProduct = (value: any, reviewSummary?: ReviewSummary) => {
     : product.categorySlug ? [product.categorySlug] : [];
   product.rating = reviewSummary?.rating ?? 0;
   product.reviewCount = reviewSummary?.reviewCount ?? 0;
+  // Pass pricingOffers through unchanged — it is already a plain object after toObject()
+  // If the document has no pricingOffers (legacy products), surface a disabled default so
+  // the frontend can safely read .pricingOffers.quantityBreaks.enabled without null-checking.
+  if (!product.pricingOffers) {
+    product.pricingOffers = {
+      quantityBreaks: { enabled: false, tiers: [] },
+      bogo: { enabled: false, buyQty: 2, getQty: 1, label: '' }
+    };
+  }
   return product;
 };
 
@@ -567,6 +578,73 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
   const metaTitle = sanitizePlainText(merged.metaTitle, 70);
   const metaDescription = sanitizePlainText(merged.metaDescription, 180);
 
+  // ── Pricing Offers ───────────────────────────────────────────────────────
+  const rawOffers = merged.pricingOffers;
+  let pricingOffers: PricingOffers | undefined;
+
+  if (rawOffers && typeof rawOffers === 'object') {
+    // --- Quantity Breaks ---
+    const rawQb = rawOffers.quantityBreaks;
+    const qbEnabled = rawQb?.enabled === true;
+    const rawTiers = Array.isArray(rawQb?.tiers) ? rawQb.tiers : [];
+    const normalizedTiers = rawTiers.map((tier: any, i: number) => {
+      const tierMinQty = toNumber(tier.minQty, `Tier ${i + 1} minimum quantity`, { integer: true }) as number;
+      if (tierMinQty < 1) throw new Error(`Tier ${i + 1} minimum quantity must be at least 1`);
+      const tierPrice = toNumber(tier.pricePerUnit, `Tier ${i + 1} price per unit`) as number;
+      if (tierPrice < 0) throw new Error(`Tier ${i + 1} price per unit must be non-negative`);
+      const tierLabel = sanitizePlainText(tier.label, 120);
+      if (!tierLabel) throw new Error(`Tier ${i + 1} label is required`);
+      return {
+        minQty: tierMinQty,
+        pricePerUnit: tierPrice,
+        label: tierLabel,
+        badge: sanitizePlainText(tier.badge, 60)
+      };
+    });
+    // Enforce unique ascending minQty
+    if (normalizedTiers.length > 0) {
+      const qtys = normalizedTiers.map((t: any) => t.minQty);
+      const uniqueQtys = new Set(qtys);
+      if (uniqueQtys.size !== qtys.length) throw new Error('Quantity break tiers must have unique minimum quantities');
+      for (let i = 1; i < qtys.length; i++) {
+        if (qtys[i] <= qtys[i - 1]) throw new Error('Quantity break tiers must have ascending minimum quantities');
+      }
+    }
+
+    // --- BOGO ---
+    const rawBogo = rawOffers.bogo;
+    const bogoEnabled = rawBogo?.enabled === true;
+    const bogoBuyQty = toNumber(rawBogo?.buyQty ?? 2, 'BOGO buy quantity', { integer: true }) as number;
+    const bogoGetQty = toNumber(rawBogo?.getQty ?? 1, 'BOGO get quantity', { integer: true }) as number;
+    if (bogoBuyQty < 1) throw new Error('BOGO buy quantity must be at least 1');
+    if (bogoGetQty < 1) throw new Error('BOGO get quantity must be at least 1');
+    if (bogoEnabled && bogoBuyQty <= bogoGetQty) {
+      throw new Error('BOGO buy quantity must be greater than get quantity (you must buy more than you get free)');
+    }
+
+    pricingOffers = {
+      quantityBreaks: {
+        enabled: qbEnabled,
+        tiers: normalizedTiers
+      },
+      bogo: {
+        enabled: bogoEnabled,
+        buyQty: bogoBuyQty,
+        getQty: bogoGetQty,
+        label: sanitizePlainText(rawBogo?.label ?? '', 120)
+      }
+    };
+  } else if (merged.pricingOffers === null) {
+    // Explicit null resets to disabled defaults
+    pricingOffers = {
+      quantityBreaks: { enabled: false, tiers: [] },
+      bogo: { enabled: false, buyQty: 2, getQty: 1, label: '' }
+    };
+  } else {
+    // Field absent from payload — preserve whatever the current document has
+    pricingOffers = current?.pricingOffers as PricingOffers | undefined;
+  }
+
   return {
     name,
     slug,
@@ -631,7 +709,8 @@ const normalizeProductPayload = (body: Record<string, any>, current?: Record<str
     productDetailBlocks,
     productDetailCustomCss: productDetailCss.raw,
     productDetailScopedCss: productDetailCss.scoped,
-    sizeGuide: sanitizeProductDescription(merged.sizeGuide) || undefined
+    sizeGuide: sanitizeProductDescription(merged.sizeGuide) || undefined,
+    pricingOffers
   };
 };
 

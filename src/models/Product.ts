@@ -66,6 +66,32 @@ export interface IProductVariantGroup {
   options: IProductVariantOption[];
 }
 
+export interface IQuantityBreakTier {
+  minQty: number;
+  pricePerUnit: number;
+  label: string;
+  badge: string;
+}
+
+export interface IQuantityBreaks {
+  enabled: boolean;
+  tiers: IQuantityBreakTier[];
+}
+
+export interface IBogo {
+  enabled: boolean;
+  /** Paid units required to trigger one BOGO reward */
+  buyQty: number;
+  /** Free units awarded per BOGO trigger. Must be < buyQty */
+  getQty: number;
+  label: string;
+}
+
+export interface IPricingOffers {
+  quantityBreaks: IQuantityBreaks;
+  bogo: IBogo;
+}
+
 export interface IProduct extends Document {
   productType: 'simple' | 'variable';
   attributes?: IProductAttribute[];
@@ -123,6 +149,7 @@ export interface IProduct extends Document {
   sizeGuide?: string;
   displayOrder?: number;
   productSchemaVersion?: number;
+  pricingOffers?: IPricingOffers;
   createdAt: Date;
 }
 
@@ -322,7 +349,27 @@ const ProductSchema = new Schema<IProduct>(
     },
     productDetailCustomCss: { type: String, maxlength: 10000 },
     productDetailScopedCss: { type: String, maxlength: 30000 },
-    sizeGuide: { type: String }
+    sizeGuide: { type: String },
+    pricingOffers: {
+      quantityBreaks: {
+        enabled: { type: Boolean, default: false },
+        tiers: [
+          {
+            minQty: { type: Number, required: true, min: 1 },
+            pricePerUnit: { type: Number, required: true, min: 0 },
+            label: { type: String, required: true, maxlength: 120 },
+            badge: { type: String, default: '', maxlength: 60 }
+          }
+        ]
+      },
+      bogo: {
+        enabled: { type: Boolean, default: false },
+        // buyQty > getQty is enforced in normalizeProductPayload before this point
+        buyQty: { type: Number, default: 2, min: 1 },
+        getQty: { type: Number, default: 1, min: 1 },
+        label: { type: String, default: '', maxlength: 120 }
+      }
+    }
   },
   { timestamps: true }
 );

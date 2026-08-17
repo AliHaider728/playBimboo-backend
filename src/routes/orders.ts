@@ -19,6 +19,8 @@ import {
 } from '../utils/mailer.js';
 import { authenticateToken, requireAdmin, AuthRequest } from '../middleware/auth.js';
 import { hasVariantGroups, normalizeInventory } from '../lib/inventory.js';
+import { resolveCartLine } from '../lib/pricingOffers.js';
+
 
 const router = Router();
 
@@ -258,14 +260,22 @@ router.post('/', async (req: Request, res: Response) => {
           requestedVariantQuantities.set(variantKey, requestedVariantQuantity);
         }
 
-        const unitPrice = variation.salePrice !== undefined && variation.salePrice !== null ? variation.salePrice : variation.regularPrice;
-        computedSubtotal += unitPrice * Number(item.quantity);
+        const baseUnitPrice = variation.salePrice !== undefined && variation.salePrice !== null ? variation.salePrice : variation.regularPrice;
+        // Server-side price resolution: apply pricingOffers regardless of what the frontend sent
+        const resolved = resolveCartLine(
+          (product as any).pricingOffers,
+          baseUnitPrice,
+          Number(item.quantity)
+        );
+        computedSubtotal += resolved.totalPrice;
         canonicalItems.push({
           productId: String(product.id),
           productType: 'variable',
           name: product.name,
-          price: unitPrice,
+          price: resolved.unitPrice,
           quantity: Number(item.quantity),
+          freeUnits: resolved.freeUnits,
+          appliedOfferLabel: resolved.appliedLabel || undefined,
           image: variation.image?.url || product.images?.[0] || '',
           variationId: String(variation.id),
           sku: variation.sku || product.sku,
@@ -305,14 +315,22 @@ router.post('/', async (req: Request, res: Response) => {
           const option = group.options?.find((candidate: any) => candidate.name === selections.get(group.name));
           return sum + Number(option?.priceOffset || 0);
         }, 0);
-        const unitPrice = product.price + variantOffset;
-        computedSubtotal += unitPrice * Number(item.quantity);
+        const baseUnitPrice = product.price + variantOffset;
+        // Server-side price resolution: apply pricingOffers regardless of what the frontend sent
+        const resolved = resolveCartLine(
+          (product as any).pricingOffers,
+          baseUnitPrice,
+          Number(item.quantity)
+        );
+        computedSubtotal += resolved.totalPrice;
         canonicalItems.push({
           productId: String(product.id),
           productType: 'simple',
           name: product.name,
-          price: unitPrice,
+          price: resolved.unitPrice,
           quantity: Number(item.quantity),
+          freeUnits: resolved.freeUnits,
+          appliedOfferLabel: resolved.appliedLabel || undefined,
           image: product.images?.[0] || '',
           selectedVariant: item.selectedVariant // Legacy
         });
@@ -415,27 +433,31 @@ router.post('/', async (req: Request, res: Response) => {
     await newOrder.save();
 
     // Deduct stock for ordered products
+    // For BOGO offers with inventory tracking, we deduct quantity + freeUnits
+    // because the warehouse must pick and ship all units (paid + free).
     for (const item of canonicalItems) {
       if (item.productId) {
+        // Total units to deduct from stock (paid + BOGO free units)
+        const totalUnitsToDeduct = item.quantity + (item.freeUnits || 0);
         // Atomic deduction via findOneAndUpdate
         if (item.productType === 'variable' && item.variationId) {
            await Product.findOneAndUpdate(
              { 
                _id: item.productId, 
                'variations.id': item.variationId,
-               'variations.stockQuantity': { $type: 'number', $gte: item.quantity }
+               'variations.stockQuantity': { $type: 'number', $gte: totalUnitsToDeduct }
              },
-             { $inc: { 'variations.$.stockQuantity': -item.quantity } }
+             { $inc: { 'variations.$.stockQuantity': -totalUnitsToDeduct } }
            );
         } else if (item.selectedVariant) {
-           await adjustProductStock(item.productId, -item.quantity, item.selectedVariant);
+           await adjustProductStock(item.productId, -totalUnitsToDeduct, item.selectedVariant);
         } else {
            await Product.findOneAndUpdate(
              { 
                _id: item.productId, 
-               stockQuantity: { $type: 'number', $gte: item.quantity }
+               stockQuantity: { $type: 'number', $gte: totalUnitsToDeduct }
              },
-             { $inc: { stockQuantity: -item.quantity } }
+             { $inc: { stockQuantity: -totalUnitsToDeduct } }
            );
         }
       }
