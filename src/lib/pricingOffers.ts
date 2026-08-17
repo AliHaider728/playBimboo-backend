@@ -90,7 +90,8 @@ export const resolveCartLine = (
   if (qb?.enabled && Array.isArray(qb.tiers) && qb.tiers.length > 0) {
     // Sort descending by minQty so we pick the highest qualifying tier
     const sortedTiers = [...qb.tiers].sort((a, b) => b.minQty - a.minQty);
-    const tier1Price = sortedTiers[sortedTiers.length - 1]?.pricePerUnit ?? baseUnitPrice;
+    const lowestTier = sortedTiers[sortedTiers.length - 1];
+    const tier1Price = (lowestTier && lowestTier.minQty === 1) ? lowestTier.pricePerUnit : baseUnitPrice;
     
     const matchedTier = sortedTiers.find(tier => quantity >= tier.minQty);
     if (matchedTier) {
