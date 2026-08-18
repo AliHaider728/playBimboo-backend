@@ -8,6 +8,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { sendMetaPurchase } from '../lib/metaConversionsApi.js';
+import { sendTikTokPurchase } from '../lib/tiktokEventsApi.js';
 import {
   getEmailFailureCode,
   sendOrderConfirmationEmail,
@@ -483,6 +484,20 @@ try {
   // successfully-created order to fail.
   console.error(
     `[Meta CAPI] Could not track order ${newOrder.orderId}:`,
+    error
+  );
+}
+
+// TikTok Events API
+try {
+  await sendTikTokPurchase({
+    order: newOrder,
+    req,
+    eventId: metaEventId, // Shared with Meta and Frontend for deduplication
+  });
+} catch (error) {
+  console.error(
+    `[TikTok Events API] Could not track order ${newOrder.orderId}:`,
     error
   );
 }
