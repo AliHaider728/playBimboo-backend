@@ -39,6 +39,7 @@ async function seedReviews() {
 
     if (products.length === 0) {
       console.log('No products found to review.');
+      await mongoose.connection.close();
       process.exit(0);
     }
 
@@ -80,10 +81,12 @@ async function seedReviews() {
     }
 
     console.log(`\nSuccessfully created ${createdCount} reviews across ${products.length} products.`);
+    await mongoose.connection.close();
     process.exit(0);
 
   } catch (error: any) {
     console.error('\nSeeding failed:', error.message);
+    await mongoose.connection.close();
     process.exit(1);
   }
 }

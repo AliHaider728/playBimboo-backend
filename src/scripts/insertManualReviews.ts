@@ -1,3 +1,4 @@
+
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import Review from '../models/Review.js';
@@ -97,10 +98,12 @@ async function insertManualReviews() {
     }
 
     console.log('\nFinished inserting manual reviews.');
+    await mongoose.connection.close();
     process.exit(0);
 
   } catch (error: any) {
     console.error('\nScript failed:', error.message);
+    await mongoose.connection.close();
     process.exit(1);
   }
 }

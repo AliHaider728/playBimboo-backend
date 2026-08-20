@@ -26,9 +26,11 @@ const run = async () => {
       }
     }
     console.log(`Updated ${updated} products with random soldCount`);
+    await mongoose.connection.close();
     process.exit(0);
   } catch (err) {
     console.error(err);
+    await mongoose.connection.close();
     process.exit(1);
   }
 };
