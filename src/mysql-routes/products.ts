@@ -278,7 +278,7 @@ router.post('/', authenticateToken, requireAdmin, async (req: AuthRequest, res: 
         ['draft', 'published'].includes(body.status) ? body.status : 'published',
         body.displayOrder ?? 0,
         body.isFeatured ? 1 : 0, body.isBestseller ? 1 : 0, body.isNewArrival ? 1 : 0, body.isSpotlight ? 1 : 0,
-        body.weight ? Number(body.weight) : null,
+        body.weight != null ? Number(body.weight) : null,
         body.deliveryType || 'store_threshold',
         body.customDeliveryFee != null ? Number(body.customDeliveryFee) : null,
         sanitizePlain(body.shortDescription, 300),
