@@ -145,7 +145,7 @@ router.post('/', async (req: Request, res: Response) => {
   await conn.beginTransaction();
 
   try {
-    const { customerName, email, phone, items, discountAmount = 0, shippingAddress, appliedCoupon, checkoutRequestId } = req.body;
+    const { customerName, email, phone, items, discountAmount = 0, shippingAddress, appliedCoupon, checkoutRequestId, shippingFee: clientShippingFee } = req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
       await conn.rollback();
@@ -160,7 +160,8 @@ router.post('/', async (req: Request, res: Response) => {
     if (checkoutRequestId && /^[a-zA-Z0-9_-]{16,120}$/.test(checkoutRequestId)) {
       const [existing] = await conn.execute('SELECT orderId FROM orders WHERE checkoutRequestId = ?', [checkoutRequestId]);
       if ((existing as any[]).length > 0) {
-        const existingOrder = await getFullOrder(conn, (existing as any[])[0].orderId);
+        let existingOrder = await getFullOrder(conn, (existing as any[])[0].orderId);
+        if (existingOrder) existingOrder = mapOrderForFrontend(existingOrder);
         await conn.commit();
         return res.status(200).json(existingOrder);
       }
@@ -212,7 +213,9 @@ router.post('/', async (req: Request, res: Response) => {
         productName: product.name,
         quantity: qty,
         price: unitPrice,
-        image: item.image || '',
+        image: item.image || null,
+        selectedVariant: item.selectedVariant || null,
+        variationId: item.variationId || null,
         trackInventory: tracks
       });
     }
@@ -222,7 +225,7 @@ router.post('/', async (req: Request, res: Response) => {
     const settings = (settingsRows as any[])[0] || { standardShippingFee: 200, freeShippingThreshold: 3000 };
     const discount = Math.max(0, Number(discountAmount));
     const afterDiscount = Math.max(0, computedSubtotal - discount);
-    const shippingFee = afterDiscount >= Number(settings.freeShippingThreshold) ? 0 : Number(settings.standardShippingFee);
+    const shippingFee = clientShippingFee !== undefined ? Number(clientShippingFee) : (afterDiscount >= Number(settings.freeShippingThreshold) ? 0 : Number(settings.standardShippingFee));
     const total = afterDiscount + shippingFee;
 
     // Create the order
@@ -248,8 +251,8 @@ router.post('/', async (req: Request, res: Response) => {
     for (const item of canonicalItems) {
       const itemId = crypto.randomBytes(12).toString('hex');
       await conn.execute(
-        `INSERT INTO order_items (id, order_id, productId, productName, quantity, price, image) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [itemId, internalId, item.productId, item.productName, item.quantity, item.price, item.image]
+        `INSERT INTO order_items (id, order_id, productId, productName, quantity, price, image, selectedVariant, variationId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [itemId, internalId, item.productId, item.productName, item.quantity, item.price, item.image, item.selectedVariant, item.variationId]
       );
 
       // Atomic stock deduction with UPDATE WHERE constraint prevents negative stock
@@ -277,7 +280,7 @@ router.post('/', async (req: Request, res: Response) => {
 
     // Fetch the complete order after commit
     const dbOrder = await getFullOrder(pool, orderId);
-    const newOrder = dbOrder ? { ...dbOrder, email: dbOrder.guestEmail, phone: dbOrder.guestPhone, customerName: dbOrder.shippingAddress?.name } : null;
+    const newOrder = dbOrder ? mapOrderForFrontend(dbOrder) : null;
 
     // Fire-and-forget CAPI events + emails (same pattern as MongoDB version)
     const metaEventId = `purchase_${orderId}`;
