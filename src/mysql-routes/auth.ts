@@ -1,12 +1,27 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import User from '../models/User.js';
+import { pool } from '../mysql-lib/db.js';
 import { authenticateToken, requireAdmin, AuthRequest } from '../middleware/auth.js';
+import crypto from 'crypto';
+import { sendPasswordResetEmail } from '../utils/mailer.js';
 
 const router = Router();
 
-// POST /api/auth/register (Public customer self-registration — always role=customer)
+// Helper to convert DB rows to public User objects
+const toPublicUser = (row: any) => {
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    role: row.role,
+    wishlist: typeof row.wishlist === 'string' ? JSON.parse(row.wishlist) : (row.wishlist || []),
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt
+  };
+};
+
+// POST /register
 router.post('/register', async (req: Request, res: Response) => {
   try {
     const { name, email, password } = req.body;
@@ -16,22 +31,31 @@ router.post('/register', async (req: Request, res: Response) => {
     if (password.length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
+    
     const normalizedEmail = email.trim().toLowerCase();
-    const existing = await User.findOne({ email: normalizedEmail });
-    if (existing) {
+    const [existing] = await pool.execute('SELECT id FROM users WHERE email = ?', [normalizedEmail]);
+    if ((existing as any[]).length > 0) {
       return res.status(409).json({ error: 'An account with this email already exists' });
     }
+    
     const passwordHash = await bcrypt.hash(password, 10);
     const finalName = name ? name.trim() : normalizedEmail.split('@')[0];
-    // Always customer — never allow frontend to set role
-    await User.create({ name: finalName, email: normalizedEmail, passwordHash, role: 'customer' });
+    const id = crypto.randomBytes(12).toString('hex');
+    const now = new Date();
+
+    await pool.execute(
+      `INSERT INTO users (id, name, email, passwordHash, role, wishlist, createdAt, updatedAt) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, finalName, normalizedEmail, passwordHash, 'customer', '[]', now, now]
+    );
+
     res.status(201).json({ message: 'Account created successfully. Please sign in to continue.' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// POST /api/auth/login (Admin & Customer Login)
+// POST /login
 router.post('/login', async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
@@ -40,11 +64,12 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
-    const user = await User.findOne({ email: normalizedEmail });
-    if (!user) {
+    const [rows] = await pool.execute('SELECT * FROM users WHERE email = ?', [normalizedEmail]);
+    if ((rows as any[]).length === 0) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
+    const user = (rows as any[])[0];
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid email or password' });
@@ -57,7 +82,7 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     const token = jwt.sign(
-      { userId: user._id, email: user.email, role: user.role },
+      { userId: user.id, email: user.email, role: user.role },
       jwtSecret,
       { expiresIn: '7d' }
     );
@@ -74,20 +99,14 @@ router.post('/login', async (req: Request, res: Response) => {
     res.json({
       message: 'Login successful',
       token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        wishlist: user.wishlist || []
-      }
+      user: toPublicUser(user)
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// POST /api/auth/logout
+// POST /logout
 router.post('/logout', (req: Request, res: Response) => {
   const isProduction = process.env.NODE_ENV === 'production';
   res.clearCookie('pb_admin_token', {
@@ -98,65 +117,72 @@ router.post('/logout', (req: Request, res: Response) => {
   res.json({ message: 'Logged out successfully' });
 });
 
-// GET /api/auth/me (Get Current User Profile)
+// GET /me
 router.get('/me', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
-    const user = await User.findById(req.user?.userId).select('-passwordHash');
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    res.json(user);
+    const [rows] = await pool.execute('SELECT * FROM users WHERE id = ?', [req.user!.userId]);
+    if ((rows as any[]).length === 0) return res.status(404).json({ error: 'User not found' });
+    res.json(toPublicUser((rows as any[])[0]));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// POST /api/auth/wishlist (Sync Customer Wishlist)
+// POST /wishlist
 router.post('/wishlist', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const { wishlist } = req.body;
-    const user = await User.findByIdAndUpdate(
-      req.user?.userId,
-      { wishlist },
-      { new: true }
-    ).select('-passwordHash');
+    
+    await pool.execute(
+      'UPDATE users SET wishlist = ?, updatedAt = ? WHERE id = ?', 
+      [JSON.stringify(wishlist), new Date(), req.user!.userId]
+    );
 
-    res.json({ wishlist: user?.wishlist || [] });
+    const [rows] = await pool.execute('SELECT wishlist FROM users WHERE id = ?', [req.user!.userId]);
+    const user = (rows as any[])[0];
+    
+    res.json({ wishlist: typeof user.wishlist === 'string' ? JSON.parse(user.wishlist) : (user.wishlist || []) });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// GET /api/auth/users (Admin only - get all users)
+// GET /users (Admin)
 router.get('/users', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
-    const users = await User.find().select('-passwordHash');
-    res.json(users);
+    const [rows] = await pool.execute('SELECT * FROM users ORDER BY createdAt DESC');
+    res.json((rows as any[]).map(toPublicUser));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// POST /api/auth/forgot-password
+// POST /forgot-password
 router.post('/forgot-password', async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email is required' });
 
-    const user = await User.findOne({ email: email.trim().toLowerCase() });
-    if (!user) {
-      // Don't leak whether the email exists.
+    const normalizedEmail = email.trim().toLowerCase();
+    const [rows] = await pool.execute('SELECT id, name, email FROM users WHERE email = ?', [normalizedEmail]);
+    if ((rows as any[]).length === 0) {
       return res.json({ message: 'If an account exists, a 6-digit verification code has been sent.' });
     }
+    const user = (rows as any[])[0];
 
     const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expires = new Date(Date.now() + 3600000); // 1 hour
 
-    user.resetPasswordToken = code;
-    user.resetPasswordExpires = new Date(Date.now() + 3600000); // 1 hour
-    await user.save();
+    await pool.execute(
+      'UPDATE users SET resetPasswordToken = ?, resetPasswordExpires = ? WHERE id = ?',
+      [code, expires, user.id]
+    );
 
-    const { sendPasswordResetEmail } = await import('../utils/mailer.js');
-    await sendPasswordResetEmail(user, code);
+    try {
+      await sendPasswordResetEmail(user, code);
+    } catch (e) {
+      console.error('Failed to send reset email:', e);
+    }
 
     res.json({ message: 'If an account exists, a 6-digit verification code has been sent.' });
   } catch (err: any) {
@@ -164,26 +190,30 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/auth/reset-password
+// POST /reset-password
 router.post('/reset-password', async (req: Request, res: Response) => {
   try {
     const { token, newPassword } = req.body;
     if (!token || !newPassword) return res.status(400).json({ error: 'Token and new password are required' });
     if (newPassword.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
 
-    const user = await User.findOne({
-      resetPasswordToken: token,
-      resetPasswordExpires: { $gt: Date.now() }
-    });
+    const now = new Date();
+    const [rows] = await pool.execute(
+      'SELECT id FROM users WHERE resetPasswordToken = ? AND resetPasswordExpires > ?',
+      [token, now]
+    );
 
-    if (!user) {
+    if ((rows as any[]).length === 0) {
       return res.status(400).json({ error: 'Password reset token is invalid or has expired.' });
     }
 
-    user.passwordHash = await bcrypt.hash(newPassword, 10);
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpires = undefined;
-    await user.save();
+    const user = (rows as any[])[0];
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    await pool.execute(
+      'UPDATE users SET passwordHash = ?, resetPasswordToken = NULL, resetPasswordExpires = NULL, updatedAt = ? WHERE id = ?',
+      [passwordHash, now, user.id]
+    );
 
     res.json({ message: 'Password has been successfully reset. You may now log in.' });
   } catch (err: any) {
@@ -191,18 +221,23 @@ router.post('/reset-password', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/auth/change-password (Authenticated User)
+// POST /change-password
 router.post('/change-password', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const { newPassword } = req.body;
     if (!newPassword || newPassword.length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
-    const user = await User.findById(req.user?.userId);
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    const [rows] = await pool.execute('SELECT id FROM users WHERE id = ?', [req.user!.userId]);
+    if ((rows as any[]).length === 0) return res.status(404).json({ error: 'User not found' });
 
-    user.passwordHash = await bcrypt.hash(newPassword, 10);
-    await user.save();
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await pool.execute(
+      'UPDATE users SET passwordHash = ?, updatedAt = ? WHERE id = ?',
+      [passwordHash, new Date(), req.user!.userId]
+    );
+
     res.json({ message: 'Password changed successfully.' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

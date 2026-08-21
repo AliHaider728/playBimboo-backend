@@ -12,10 +12,7 @@ import {
   uploadReviewImage
 } from '../lib/cloudinary.js';
 import { createProductThumbnail } from '../lib/productImages.js';
-import Product from '../models/Product.js';
-import Category from '../models/Category.js';
-import { connectToDatabase } from '../lib/database.js';
-
+import { pool } from '../mysql-lib/db.js';
 const router = Router();
 
 const upload = multer({
@@ -131,8 +128,8 @@ router.delete(
     const publicId = typeof req.body?.publicId === 'string' ? req.body.publicId.trim() : '';
     if (!publicId) return res.status(400).json({ error: 'Cloudinary public ID is required' });
     try {
-      await connectToDatabase();
-      if (await Category.exists({ imagePublicId: publicId })) {
+      const [rows] = await pool.execute('SELECT id FROM categories WHERE imagePublicId = ?', [publicId]);
+      if ((rows as any[]).length > 0) {
         return res.status(409).json({ error: 'This image is attached to a saved category.' });
       }
       const result = await deleteCategoryImage(publicId);
@@ -189,14 +186,8 @@ router.delete(
     if (!publicId) return res.status(400).json({ error: 'Cloudinary public ID is required' });
 
     try {
-      await connectToDatabase();
-      const referencedProduct = await Product.exists({
-        $or: [
-          { imagePublicIds: publicId },
-          { imageThumbnailPublicIds: publicId },
-          { 'productDetailBlocks.image.publicId': publicId }
-        ]
-      });
+      const [pRows] = await pool.execute('SELECT product_id FROM product_images WHERE public_id = ? OR thumbnail_public_id = ?', [publicId, publicId]);
+      const referencedProduct = (pRows as any[]).length > 0;
       if (referencedProduct) {
         return res.status(409).json({
           error: 'This image is attached to a saved product and must be removed through the product editor.'
@@ -230,3 +221,4 @@ router.use((error: unknown, _req: Request, res: Response, next: NextFunction) =>
 });
 
 export default router;
+

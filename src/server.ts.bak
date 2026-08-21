@@ -1,19 +1,19 @@
 import 'dotenv/config';
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors, { CorsOptions } from 'cors';
-
-import uploadRoutes from './mysql-routes/upload.js';
-import { pool } from './mysql-lib/db.js';
-
-import mysqlContactRoutes from './mysql-routes/contact.js';
-import mysqlCouponRoutes from './mysql-routes/coupons.js';
-import mysqlSettingsRoutes from './mysql-routes/settings.js';
-import mysqlGlobalAttributeRoutes from './mysql-routes/globalAttributes.js';
-import mysqlCategoryRoutes from './mysql-routes/categories.js';
-import mysqlAuthRoutes from './mysql-routes/auth.js';
-import mysqlReviewRoutes from './mysql-routes/reviews.js';
-import mysqlOrderRoutes from './mysql-routes/orders.js';
-import mysqlProductRoutes from './mysql-routes/products.js';
+import { connectToDatabase } from './lib/database.js';
+import { migrateSettings } from './lib/migrateSettings.js';
+import categoryRoutes from './routes/categories.js';
+import productRoutes from './routes/products.js';
+import orderRoutes from './routes/orders.js';
+import couponRoutes from './routes/coupons.js';
+import settingsRoutes from './routes/settings.js';
+import reviewRoutes from './routes/reviews.js';
+import authRoutes from './routes/auth.js';
+import uploadRoutes from './routes/upload.js';
+import seedRoutes from './routes/seed.js';
+import globalAttributeRoutes from './routes/globalAttributes.js';
+import contactRoutes from './routes/contact.js';
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -46,18 +46,32 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
+const requireDatabaseConnection = async (
+  _req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    await connectToDatabase();
+    next();
+  } catch {
+    console.error('MongoDB request connection failed.');
+    res.status(503).json({ error: 'Database connection unavailable' });
+  }
+};
+
 app.get('/', async (_req: Request, res: Response) => {
   let dbStatus = 'disconnected';
   try {
-    await pool.execute('SELECT 1');
-    dbStatus = 'connected (MySQL)';
+    const mongoose = await connectToDatabase();
+    dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
   } catch {
     dbStatus = 'error';
   }
 
   res.json({
     status: 'online',
-    message: 'PlayBimboo API Backend is running (MySQL)',
+    message: 'PlayBimboo API Backend is running',
     database: dbStatus,
     endpoints: [
       '/api/products',
@@ -75,14 +89,15 @@ app.get('/', async (_req: Request, res: Response) => {
 
 app.get('/api/health', async (_req: Request, res: Response) => {
   try {
-    await pool.execute('SELECT 1');
-    
+    const mongoose = await connectToDatabase();
+    // Run migration once per boot when DB is reachable
+    void migrateSettings();
     res.json({
       status: 'ok',
-      dbConnected: true
+      dbConnected: mongoose.connection.readyState === 1
     });
   } catch {
-    console.error('MySQL health check failed.');
+    console.error('MongoDB health check failed.');
     res.status(503).json({
       status: 'error',
       dbConnected: false,
@@ -91,19 +106,21 @@ app.get('/api/health', async (_req: Request, res: Response) => {
   }
 });
 
-app.use('/api/contact', mysqlContactRoutes);
-app.use('/api/coupons', mysqlCouponRoutes);
-app.use('/api/settings', mysqlSettingsRoutes);
-app.use('/api/global-attributes', mysqlGlobalAttributeRoutes);
-app.use('/api/categories', mysqlCategoryRoutes);
-app.use('/api/auth', mysqlAuthRoutes);
-app.use('/api/reviews', mysqlReviewRoutes);
-app.use('/api/orders', mysqlOrderRoutes);
-app.use('/api/products', mysqlProductRoutes);
+app.use('/api/categories', requireDatabaseConnection, categoryRoutes);
+app.use('/api/products', requireDatabaseConnection, productRoutes);
+app.use('/api/global-attributes', requireDatabaseConnection, globalAttributeRoutes);
+app.use('/api/orders', requireDatabaseConnection, orderRoutes);
+app.use('/api/coupons', requireDatabaseConnection, couponRoutes);
+app.use('/api/settings', requireDatabaseConnection, settingsRoutes);
+app.use('/api/reviews', requireDatabaseConnection, reviewRoutes);
+app.use('/api/auth', requireDatabaseConnection, authRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/seed', requireDatabaseConnection, seedRoutes);
+app.use('/api/contact', requireDatabaseConnection, contactRoutes);
 
 export default app;
 
+// cPanel/Passenger expects module.exports, not TypeScript's exports.default.
 if (typeof module !== 'undefined') {
   module.exports = app;
 }
@@ -112,6 +129,7 @@ const isPassengerRuntime = Boolean(
   process.env.PASSENGER_APP_ENV || process.env.PASSENGER_BASE_URI
 );
 
+// If not running in a serverless environment (e.g. running directly via node/tsx)
 if (
   typeof require !== 'undefined' &&
   require.main === module &&
@@ -123,6 +141,9 @@ if (
     throw new Error('PORT must be an integer between 1 and 65535');
   }
 
+  // Managed runtimes (cPanel/Passenger, PaaS) assign the port themselves and
+  // run many apps per host, so a "port in use" reading there is meaningless —
+  // and exiting on it means the app never listens and the vhost serves 503.
   const isManagedRuntime =
     process.env.NODE_ENV === 'production' || Boolean(process.env.PASSENGER_BASE_URI);
 
@@ -146,32 +167,38 @@ if (
           process.exit(1);
         }
       } catch (err) {
+        // Port is likely free if command fails
       }
     }
 
     const server = app.listen(port, async () => {
       try {
-        await pool.execute('SELECT 1');
-        
-        const [[{ count: products }]] = await pool.execute<any>('SELECT COUNT(*) as count FROM products');
-        const [[{ count: reviews }]] = await pool.execute<any>('SELECT COUNT(*) as count FROM reviews');
-        const [[{ count: orders }]] = await pool.execute<any>('SELECT COUNT(*) as count FROM orders');
-        const [[{ count: categories }]] = await pool.execute<any>('SELECT COUNT(*) as count FROM categories');
-        const [[{ count: coupons }]] = await pool.execute<any>('SELECT COUNT(*) as count FROM coupons');
-        const [[{ count: users }]] = await pool.execute<any>('SELECT COUNT(*) as count FROM users');
+        const mongoose = await connectToDatabase();
+        const db = mongoose.connection.db;
+        if (!db) throw new Error('Database not connected properly');
+        const dbName = db.databaseName;
+
+        const [products, reviews, orders, categories, coupons, users] = await Promise.all([
+          db.collection('products').countDocuments(),
+          db.collection('reviews').countDocuments(),
+          db.collection('orders').countDocuments(),
+          db.collection('categories').countDocuments(),
+          db.collection('coupons').countDocuments(),
+          db.collection('users').countDocuments()
+        ]);
 
         console.log('\n=========================================');
-        console.log('  PlayBimboo Backend API (MySQL)');
+        console.log('  PlayBimboo Backend API');
         console.log(`  Status: RUNNING on http://localhost:${port}`);
-        console.log('  Database: CONNECTED (MySQL)');
+        console.log(`  Database: CONNECTED (${dbName})`);
         console.log(`  Products: ${products} | Reviews: ${reviews} | Orders: ${orders}`);
         console.log(`  Categories: ${categories} | Coupons: ${coupons} | Users: ${users}`);
         console.log('=========================================\n');
       } catch (err) {
         console.log('\n=========================================');
-        console.log('  PlayBimboo Backend API (MySQL)');
+        console.log('  PlayBimboo Backend API');
         console.log(`  Status: RUNNING on http://localhost:${port}`);
-        console.log('  Database: DISCONNECTED (MySQL Error)');
+        console.log('  Database: DISCONNECTED (Error connecting)');
         console.log('=========================================\n');
       }
     });
@@ -179,7 +206,7 @@ if (
     server.on('error', (error: any) => {
       if (error.code === 'EADDRINUSE') {
         console.error(`\n🚨 ERROR: Port ${port} is already in use by another process.`);
-        console.error(`Please stop the process running on port ${port} or specify a different port.\n`);
+        console.error(`Please stop the process running on port ${port} or specify a different port using process.env.PORT.\n`);
         process.exit(1);
       } else {
         console.error('Server error:', error);

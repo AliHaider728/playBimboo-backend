@@ -1,0 +1,44 @@
+[
+  {
+    "_id": "6a79a90ded5904bba4db33b3",
+    "code": "BIMBOOO3",
+    "discountType": "percentage",
+    "discountValue": 90,
+    "minPurchase": 30,
+    "isActive": true,
+    "expiryDate": "2026-12-31",
+    "usageLimit": 500,
+    "usageCount": 0,
+    "createdAt": "2026-08-10T10:33:49.183Z",
+    "updatedAt": "2026-08-10T10:33:49.183Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a79c420193025d28bc0b4d9",
+    "code": "TOYSBIMBOO2",
+    "discountType": "percentage",
+    "discountValue": 100,
+    "minPurchase": 30,
+    "isActive": true,
+    "expiryDate": "2026-12-31",
+    "usageLimit": 500,
+    "usageCount": 0,
+    "createdAt": "2026-08-10T12:29:20.755Z",
+    "updatedAt": "2026-08-10T12:29:20.755Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a7b7205b4adb5f16e2d4aec",
+    "code": "BIMBOO200",
+    "discountType": "fixed",
+    "discountValue": 200,
+    "minPurchase": 0,
+    "isActive": true,
+    "expiryDate": "2026-12-31",
+    "usageLimit": 500,
+    "usageCount": 0,
+    "createdAt": "2026-08-11T19:03:33.009Z",
+    "updatedAt": "2026-08-11T19:03:33.009Z",
+    "__v": 0
+  }
+]

@@ -1,0 +1,610 @@
+[
+  {
+    "_id": "6a7bbefe08e4b90462300475",
+    "userId": "6a7bbefd08e4b90462300473",
+    "orderId": "ORD-MSPCTTP2-WB7E",
+    "customerName": "Haroon Khokhar",
+    "email": "haroonrasul@gmail.com",
+    "phone": "03334255544",
+    "items": [
+      {
+        "productId": "6a75ea81a95aed52db0d1584",
+        "name": "Gyro RC Form Fighter Jet",
+        "price": 3100,
+        "quantity": 1,
+        "image": "https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786112293/playbimboo/products/73c6e0c1-2538-450e-ba89-e4cfc5e9736a.webp",
+        "productType": "simple",
+        "_id": "6a7bbefe08e4b90462300476"
+      }
+    ],
+    "subtotal": 3100,
+    "deliveryCharge": 0,
+    "discountAmount": 0,
+    "total": 3100,
+    "status": "Delivered",
+    "paymentMethod": "Cash on Delivery (COD)",
+    "shippingAddress": {
+      "fullName": "Haroon Khokhar",
+      "street": "149-E Street No 3, Phase 6, DHA Lahore",
+      "city": "Lahore",
+      "state": "Punjab",
+      "postalCode": "54810",
+      "phone": "03334255544",
+      "country": "Pakistan"
+    },
+    "checkoutRequestId": "d1a4fd94-03f1-4c3a-99c4-b77a5902b619",
+    "date": "2026-08-12",
+    "newOrderEmailRecipients": [
+      "sales@playbimboo.com",
+      "abraransarise@gmail.com"
+    ],
+    "createdAt": "2026-08-12T00:31:58.670Z",
+    "updatedAt": "2026-08-17T15:15:13.579Z",
+    "__v": 1,
+    "confirmationEmailAccepted": true,
+    "confirmationEmailMessageId": "<915c80b4-5e1f-d37a-cfff-a2d699402deb@playbimboo.com>",
+    "confirmationEmailSentAt": "2026-08-12T00:32:00.306Z",
+    "newOrderEmailAttemptedAt": "2026-08-12T00:32:00.496Z",
+    "newOrderEmailMessageId": "<61d065e1-10fb-1089-ab3f-74c71282284c@playbimboo.com>",
+    "newOrderEmailSentAt": "2026-08-12T00:32:01.713Z",
+    "deliveredAt": "2026-08-17T15:15:12.224Z",
+    "deliveredEmailAccepted": true,
+    "deliveredEmailMessageId": "<f1ac2fad-a08c-9053-21e6-1a4f2bc5bbc2@playbimboo.com>",
+    "deliveredEmailSentAt": "2026-08-17T15:15:13.578Z"
+  },
+  {
+    "_id": "6a7c5b98931f9ad281ccc848",
+    "userId": "6a7c5b97931f9ad281ccc846",
+    "orderId": "ORD-MSQ0P3HV-WJIM",
+    "customerName": "Ghazanfar Memon",
+    "email": "memonghazanfar@gmail.com",
+    "phone": "03108603998",
+    "items": [
+      {
+        "productId": "6a75ea81a95aed52db0d1584",
+        "name": "Gyro RC Form Fighter Jet",
+        "price": 3100,
+        "quantity": 1,
+        "image": "https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786112293/playbimboo/products/73c6e0c1-2538-450e-ba89-e4cfc5e9736a.webp",
+        "productType": "simple",
+        "_id": "6a7c5b98931f9ad281ccc849"
+      }
+    ],
+    "subtotal": 3100,
+    "deliveryCharge": 0,
+    "discountAmount": 0,
+    "total": 3100,
+    "status": "Delivered",
+    "paymentMethod": "Cash on Delivery (COD)",
+    "shippingAddress": {
+      "fullName": "Ghazanfar Memon",
+      "street": "House# 931/96 Bir Bux Colony Dadu",
+      "city": "Dadu",
+      "state": "Sindh",
+      "postalCode": "76200",
+      "phone": "03108603998",
+      "country": "Pakistan"
+    },
+    "checkoutRequestId": "adb5c42d-50d9-4bb0-a51b-2217f10375ac",
+    "date": "2026-08-12",
+    "newOrderEmailRecipients": [
+      "sales@playbimboo.com",
+      "abraransarise@gmail.com"
+    ],
+    "createdAt": "2026-08-12T11:40:08.876Z",
+    "updatedAt": "2026-08-18T11:59:26.133Z",
+    "__v": 1,
+    "confirmationEmailAccepted": true,
+    "confirmationEmailMessageId": "<a06812ee-8192-6cc0-e85c-b5ed45f9c416@playbimboo.com>",
+    "confirmationEmailSentAt": "2026-08-12T11:40:10.470Z",
+    "newOrderEmailAttemptedAt": "2026-08-12T11:40:10.661Z",
+    "newOrderEmailMessageId": "<9165bbbb-8ca4-d713-974d-e2cc19934bd3@playbimboo.com>",
+    "newOrderEmailSentAt": "2026-08-12T11:40:11.885Z",
+    "deliveredAt": "2026-08-18T11:59:24.548Z",
+    "deliveredEmailAccepted": true,
+    "deliveredEmailMessageId": "<bbc93c48-95f3-7756-4676-4753dc920cd2@playbimboo.com>",
+    "deliveredEmailSentAt": "2026-08-18T11:59:26.132Z"
+  },
+  {
+    "_id": "6a833e560118e6a17cb46c7d",
+    "userId": "6a833e540118e6a17cb46c7b",
+    "orderId": "ORD-MSXHD72Y-RAYK",
+    "customerName": "Noor Ul Hameed",
+    "email": "noorchtoo@gmail.com",
+    "phone": "03007421404",
+    "items": [
+      {
+        "productId": "6a79d8595697f0b996c0c0f5",
+        "name": "2.4GHz Cyclone Stunt RC Fighter Drone",
+        "price": 3400,
+        "quantity": 1,
+        "image": "https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786454964/playbimboo/products/b8a2587d-cb0f-439e-a085-f1d486d9aa81.webp",
+        "productType": "simple",
+        "_id": "6a833e560118e6a17cb46c7e"
+      }
+    ],
+    "subtotal": 3400,
+    "deliveryCharge": 0,
+    "discountAmount": 0,
+    "total": 3400,
+    "status": "Pending",
+    "paymentMethod": "Cash on Delivery (COD)",
+    "shippingAddress": {
+      "fullName": "Noor Ul Hameed",
+      "street": "Innovista Rachna, DHA Gujranwala, G.T Road",
+      "city": "Gujranwala",
+      "state": "",
+      "postalCode": "",
+      "phone": "03007421404",
+      "country": "Pakistan"
+    },
+    "checkoutRequestId": "d7ca76d8-f868-494a-bbec-c927374ba521",
+    "date": "2026-08-17",
+    "newOrderEmailRecipients": [
+      "sales@playbimboo.com",
+      "abraransarise@gmail.com"
+    ],
+    "createdAt": "2026-08-17T17:01:10.305Z",
+    "updatedAt": "2026-08-17T17:01:13.361Z",
+    "__v": 1,
+    "confirmationEmailAccepted": true,
+    "confirmationEmailMessageId": "<206af3ac-ca18-82bb-caac-cffc155f5e81@playbimboo.com>",
+    "confirmationEmailSentAt": "2026-08-17T17:01:11.891Z",
+    "newOrderEmailAttemptedAt": "2026-08-17T17:01:12.082Z",
+    "newOrderEmailMessageId": "<ce6677d5-0673-d4c0-e0f2-9fd344d3f628@playbimboo.com>",
+    "newOrderEmailSentAt": "2026-08-17T17:01:13.360Z"
+  },
+  {
+    "_id": "6a8367cf1410c46b33e2326a",
+    "userId": "6a8367cd1410c46b33e23268",
+    "orderId": "ORD-MSXNOQZB-8T35",
+    "customerName": "Ali Asim",
+    "email": "aliasimhr@gmail.com",
+    "phone": "03018230425",
+    "items": [
+      {
+        "productId": "6a75ea81a95aed52db0d1584",
+        "name": "Gyro RC Form Fighter Jet",
+        "price": 3100,
+        "quantity": 1,
+        "image": "https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786112293/playbimboo/products/73c6e0c1-2538-450e-ba89-e4cfc5e9736a.webp",
+        "productType": "simple",
+        "_id": "6a8367cf1410c46b33e2326b"
+      }
+    ],
+    "subtotal": 3100,
+    "deliveryCharge": 0,
+    "discountAmount": 0,
+    "total": 3100,
+    "status": "Processing",
+    "paymentMethod": "Cash on Delivery (COD)",
+    "shippingAddress": {
+      "fullName": "Ali Asim",
+      "street": "Sd 267 Falcon Complex Malir Cantt",
+      "city": "Karachi",
+      "state": "",
+      "postalCode": "",
+      "phone": "03018230425",
+      "country": "Pakistan"
+    },
+    "checkoutRequestId": "90ca6101-1484-4ea0-8cc4-3fa5c24034dc",
+    "date": "2026-08-17",
+    "newOrderEmailRecipients": [
+      "sales@playbimboo.com",
+      "abraransarise@gmail.com"
+    ],
+    "createdAt": "2026-08-17T19:58:07.096Z",
+    "updatedAt": "2026-08-18T08:48:04.839Z",
+    "__v": 1,
+    "confirmationEmailAccepted": true,
+    "confirmationEmailMessageId": "<3da36cbb-c477-073b-5953-52f52d81d1d9@playbimboo.com>",
+    "confirmationEmailSentAt": "2026-08-17T19:58:08.826Z",
+    "newOrderEmailAttemptedAt": "2026-08-17T19:58:09.018Z",
+    "newOrderEmailMessageId": "<1ef98b38-dc98-d7b0-a270-75cfe2ddac8c@playbimboo.com>",
+    "newOrderEmailSentAt": "2026-08-17T19:58:10.227Z"
+  },
+  {
+    "_id": "6a83e981fee8e60e6067fd1e",
+    "userId": "6a83e97ffee8e60e6067fd1c",
+    "orderId": "ORD-MSY7GDSL-2WBH",
+    "customerName": "Munsif Khan",
+    "email": "munsifkhanqwe437@gmail.com",
+    "phone": "03495848078",
+    "items": [
+      {
+        "productId": "6a79d8595697f0b996c0c0f5",
+        "name": "2.4GHz Cyclone Stunt RC Fighter Drone",
+        "price": 3400,
+        "quantity": 1,
+        "image": "https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786454964/playbimboo/products/b8a2587d-cb0f-439e-a085-f1d486d9aa81.webp",
+        "productType": "simple",
+        "_id": "6a83e981fee8e60e6067fd1f"
+      }
+    ],
+    "subtotal": 3400,
+    "deliveryCharge": 0,
+    "discountAmount": 0,
+    "total": 3400,
+    "status": "Processing",
+    "paymentMethod": "Cash on Delivery (COD)",
+    "shippingAddress": {
+      "fullName": "Munsif Khan",
+      "street": "Rawalpandey asghar mal roud sha plza 2 flour almahdi international ajance",
+      "city": "Rawlpandey",
+      "state": "Province",
+      "postalCode": "",
+      "phone": "03495848078",
+      "country": "Pakistan"
+    },
+    "checkoutRequestId": "c57ea63e-4168-49ac-8d6d-01b52b33a47c",
+    "date": "2026-08-18",
+    "newOrderEmailRecipients": [
+      "sales@playbimboo.com",
+      "abraransarise@gmail.com"
+    ],
+    "createdAt": "2026-08-18T05:11:29.096Z",
+    "updatedAt": "2026-08-18T08:53:28.320Z",
+    "__v": 1,
+    "confirmationEmailAccepted": true,
+    "confirmationEmailMessageId": "<1affcf7a-ac7f-f5a5-fa4d-42850fefb90f@playbimboo.com>",
+    "confirmationEmailSentAt": "2026-08-18T05:11:30.694Z",
+    "newOrderEmailAttemptedAt": "2026-08-18T05:11:30.917Z",
+    "newOrderEmailMessageId": "<36efc905-f145-492f-2260-70a9580aabdb@playbimboo.com>",
+    "newOrderEmailSentAt": "2026-08-18T05:11:32.130Z"
+  },
+  {
+    "_id": "6a84156b945a4a4f51ef8c29",
+    "userId": "6a84156a945a4a4f51ef8c27",
+    "orderId": "ORD-MSYE5CKF-4A9X",
+    "customerName": "Dr. Azam Jan",
+    "email": "azamjancms@gmail.com",
+    "phone": "09233393536",
+    "items": [
+      {
+        "productId": "6a7478d4c0d100e797be76ce",
+        "name": "Magnetic Building Blocks",
+        "price": 2450,
+        "quantity": 1,
+        "image": "https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786017996/playbimboo/products/58f3c34f-94c2-44b3-9c46-c9362f9dcff2.webp",
+        "variationId": "var-1786017115492-psqdcvgcx2j",
+        "productType": "variable",
+        "selectedAttributes": {
+          "size": "64 Blocks"
+        },
+        "_id": "6a84156b945a4a4f51ef8c2a"
+      }
+    ],
+    "subtotal": 2450,
+    "deliveryCharge": 0,
+    "discountAmount": 0,
+    "total": 2450,
+    "status": "Processing",
+    "paymentMethod": "Cash on Delivery (COD)",
+    "shippingAddress": {
+      "fullName": "Dr. Azam Jan",
+      "street": "Hotizen Electronics in front of Narional Bank Tangi branch, tehsil and P/O Tangi",
+      "city": "Charsadda",
+      "state": "Khyber Pakhtunkhwa",
+      "postalCode": "24540",
+      "phone": "09233393536",
+      "country": "Pakistan"
+    },
+    "checkoutRequestId": "291901e2-6daf-4654-9fbb-533d106b24e7",
+    "date": "2026-08-18",
+    "newOrderEmailRecipients": [
+      "sales@playbimboo.com",
+      "abraransarise@gmail.com"
+    ],
+    "createdAt": "2026-08-18T08:18:51.577Z",
+    "updatedAt": "2026-08-18T08:47:53.934Z",
+    "__v": 1,
+    "confirmationEmailAccepted": true,
+    "confirmationEmailMessageId": "<ded7407f-4fbb-e912-b2c3-68abaac5420b@playbimboo.com>",
+    "confirmationEmailSentAt": "2026-08-18T08:18:53.147Z",
+    "newOrderEmailAttemptedAt": "2026-08-18T08:18:53.354Z",
+    "newOrderEmailMessageId": "<c54341ba-fb0d-6e53-4df5-8fcd12f7b6e0@playbimboo.com>",
+    "newOrderEmailSentAt": "2026-08-18T08:18:54.563Z"
+  },
+  {
+    "_id": "6a841ae372069372084b415d",
+    "userId": "6a841ae172069372084b415b",
+    "orderId": "ORD-MSYEZCGN-DC8N",
+    "customerName": "Hazrat ali shah",
+    "email": "drhazratali@gmail.com",
+    "phone": "03149700747",
+    "items": [
+      {
+        "productId": "6a79d8595697f0b996c0c0f5",
+        "name": "2.4GHz Cyclone Stunt RC Fighter Drone",
+        "price": 3400,
+        "quantity": 1,
+        "image": "https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786454964/playbimboo/products/b8a2587d-cb0f-439e-a085-f1d486d9aa81.webp",
+        "productType": "simple",
+        "_id": "6a841ae372069372084b415e"
+      }
+    ],
+    "subtotal": 3400,
+    "deliveryCharge": 0,
+    "discountAmount": 0,
+    "total": 3400,
+    "status": "Processing",
+    "paymentMethod": "Cash on Delivery (COD)",
+    "shippingAddress": {
+      "fullName": "Hazrat ali shah",
+      "street": "Muhallah gul bahar near kaajco CNG,topi road swabi,district swabi,khyber pukhtoonkhwa",
+      "city": "Swabi(kpk)",
+      "state": "Kpk",
+      "postalCode": "",
+      "phone": "03149700747",
+      "country": "Pakistan"
+    },
+    "checkoutRequestId": "5dcca2ca-6fa3-4998-8707-0a0c0512b45c",
+    "date": "2026-08-18",
+    "newOrderEmailRecipients": [
+      "sales@playbimboo.com",
+      "abraransarise@gmail.com"
+    ],
+    "createdAt": "2026-08-18T08:42:11.011Z",
+    "updatedAt": "2026-08-18T08:47:58.708Z",
+    "__v": 1,
+    "confirmationEmailAccepted": true,
+    "confirmationEmailMessageId": "<d04bedbd-7819-97fe-290e-b3a94b3d321a@playbimboo.com>",
+    "confirmationEmailSentAt": "2026-08-18T08:42:12.610Z",
+    "newOrderEmailAttemptedAt": "2026-08-18T08:42:12.831Z",
+    "newOrderEmailMessageId": "<7f4f7df9-dc88-ce3d-48cb-52a219875d76@playbimboo.com>",
+    "newOrderEmailSentAt": "2026-08-18T08:42:14.044Z"
+  },
+  {
+    "_id": "6a851c57faa895c653cc3ad4",
+    "userId": "6a851c55faa895c653cc3ad2",
+    "orderId": "ORD-MSZI7ZKJ-T1S6",
+    "customerName": "Alishan Shan",
+    "email": "ghulamhaider.bh0097@gmail.com",
+    "phone": "03090022897",
+    "items": [
+      {
+        "productId": "6a7478d4c0d100e797be76ce",
+        "name": "Magnetic Building Blocks",
+        "price": 1899,
+        "quantity": 1,
+        "image": "https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786018000/playbimboo/products/60480e41-6db0-4c9a-b528-03e242211dd5.webp",
+        "variationId": "var-1786017115492-v0uc09svxz8",
+        "productType": "variable",
+        "selectedAttributes": {
+          "size": "42 Blocks"
+        },
+        "_id": "6a851c57faa895c653cc3ad5"
+      }
+    ],
+    "subtotal": 1899,
+    "deliveryCharge": 0,
+    "discountAmount": 0,
+    "total": 1899,
+    "status": "Processing",
+    "paymentMethod": "Cash on Delivery (COD)",
+    "shippingAddress": {
+      "fullName": "Alishan Shan",
+      "street": "MOH nabi pura fowara chok dinga district gujrat teh kharian",
+      "city": "Dinga District Gujrat Teh Kharian Moh Nabi Pura Fowara Chok Dinga",
+      "state": "",
+      "postalCode": "",
+      "phone": "03090022897",
+      "country": "Pakistan"
+    },
+    "checkoutRequestId": "0ef01dd2-d407-4fb2-8649-5711e51de55d",
+    "date": "2026-08-19",
+    "newOrderEmailRecipients": [
+      "sales@playbimboo.com",
+      "abraransarise@gmail.com"
+    ],
+    "createdAt": "2026-08-19T03:00:39.325Z",
+    "updatedAt": "2026-08-19T08:14:15.925Z",
+    "__v": 1,
+    "confirmationEmailAccepted": true,
+    "confirmationEmailMessageId": "<2203201f-a62f-4626-c376-6a6f62ea07d6@playbimboo.com>",
+    "confirmationEmailSentAt": "2026-08-19T03:00:40.935Z",
+    "newOrderEmailAttemptedAt": "2026-08-19T03:00:41.127Z",
+    "newOrderEmailMessageId": "<e08134b2-9215-5d78-c200-6fb17bcf5e1d@playbimboo.com>",
+    "newOrderEmailSentAt": "2026-08-19T03:00:42.366Z"
+  },
+  {
+    "_id": "6a856929d44e04dc27d08d96",
+    "userId": "6a856928d44e04dc27d08d94",
+    "orderId": "ORD-MSZTXICI-4RQW",
+    "customerName": "Adnan ahmed",
+    "email": "noor.ghous@yahoo.com",
+    "phone": "03225588775",
+    "items": [
+      {
+        "productId": "6a79d8595697f0b996c0c0f5",
+        "name": "2.4GHz Cyclone Stunt RC Fighter Drone",
+        "price": 3400,
+        "quantity": 1,
+        "image": "https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786454964/playbimboo/products/b8a2587d-cb0f-439e-a085-f1d486d9aa81.webp",
+        "productType": "simple",
+        "_id": "6a856929d44e04dc27d08d97"
+      }
+    ],
+    "subtotal": 3400,
+    "deliveryCharge": 0,
+    "discountAmount": 0,
+    "total": 3400,
+    "status": "Processing",
+    "paymentMethod": "Cash on Delivery (COD)",
+    "shippingAddress": {
+      "fullName": "Adnan ahmed",
+      "street": "House#27, Street#3, Gulistan-e-yousuf,  tipu road, Rawalpindi",
+      "city": "Rawalpindi",
+      "state": "Punjab",
+      "postalCode": "46000",
+      "phone": "03225588775",
+      "country": "Pakistan"
+    },
+    "checkoutRequestId": "6bc018a5-7b20-4ede-b8d4-1ea357a668db",
+    "date": "2026-08-19",
+    "newOrderEmailRecipients": [
+      "sales@playbimboo.com",
+      "abraransarise@gmail.com"
+    ],
+    "createdAt": "2026-08-19T08:28:25.799Z",
+    "updatedAt": "2026-08-19T13:26:27.447Z",
+    "__v": 1,
+    "confirmationEmailAccepted": true,
+    "confirmationEmailMessageId": "<7106be2e-ed45-ca4b-dcbc-b4279a001382@playbimboo.com>",
+    "confirmationEmailSentAt": "2026-08-19T08:28:27.394Z",
+    "newOrderEmailAttemptedAt": "2026-08-19T08:28:27.587Z",
+    "newOrderEmailMessageId": "<dc21f8d4-c155-633c-3ec7-72eed32f6ea4@playbimboo.com>",
+    "newOrderEmailSentAt": "2026-08-19T08:28:28.876Z"
+  },
+  {
+    "_id": "6a857b42ee9061f9c31e0ec8",
+    "userId": "6a857b40ee9061f9c31e0ec6",
+    "orderId": "ORD-MSZWOSTZ-P33D",
+    "customerName": "Mahmood khawaja",
+    "email": "mahmoodbashir.7766@gmail.com",
+    "phone": "03118522989",
+    "items": [
+      {
+        "productId": "6a7478d4c0d100e797be76ce",
+        "name": "Magnetic Building Blocks",
+        "price": 2450,
+        "quantity": 1,
+        "image": "https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786017996/playbimboo/products/58f3c34f-94c2-44b3-9c46-c9362f9dcff2.webp",
+        "variationId": "var-1786017115492-psqdcvgcx2j",
+        "productType": "variable",
+        "selectedAttributes": {
+          "size": "64 Blocks"
+        },
+        "_id": "6a857b42ee9061f9c31e0ec9"
+      }
+    ],
+    "subtotal": 2450,
+    "deliveryCharge": 0,
+    "discountAmount": 0,
+    "total": 2450,
+    "status": "Processing",
+    "paymentMethod": "Cash on Delivery (COD)",
+    "shippingAddress": {
+      "fullName": "Mahmood khawaja",
+      "street": "Heartland Pharmacy Lathrar Road Islamabad Thanda Pani",
+      "city": "Islamabad",
+      "state": "Islamabad",
+      "postalCode": "40000",
+      "phone": "03118522989",
+      "country": "Pakistan"
+    },
+    "checkoutRequestId": "00353bb6-246f-45fe-9814-a078ee5a06d3",
+    "date": "2026-08-19",
+    "newOrderEmailRecipients": [
+      "sales@playbimboo.com",
+      "abraransarise@gmail.com"
+    ],
+    "createdAt": "2026-08-19T09:45:38.323Z",
+    "updatedAt": "2026-08-19T13:26:31.028Z",
+    "__v": 1,
+    "confirmationEmailAccepted": true,
+    "confirmationEmailMessageId": "<6620ba0b-b532-59d2-9528-2c1ee1bac4e9@playbimboo.com>",
+    "confirmationEmailSentAt": "2026-08-19T09:45:39.852Z",
+    "newOrderEmailAttemptedAt": "2026-08-19T09:45:40.042Z",
+    "newOrderEmailMessageId": "<4b303514-a053-fa81-1524-d4086f143208@playbimboo.com>",
+    "newOrderEmailSentAt": "2026-08-19T09:45:41.286Z"
+  },
+  {
+    "_id": "6a86d1ba11dbe11460846b9a",
+    "userId": "6a86d1b811dbe11460846b98",
+    "orderId": "ORD-MT1CVWXM-I1CG",
+    "customerName": "Zahidiqbal Iqbal",
+    "email": "iqbalzahid836@gmail.com",
+    "phone": "03069368892",
+    "items": [
+      {
+        "productId": "6a79d8595697f0b996c0c0f5",
+        "name": "2.4GHz Cyclone Stunt RC Fighter Drone",
+        "price": 3400,
+        "quantity": 1,
+        "image": "https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786454964/playbimboo/products/b8a2587d-cb0f-439e-a085-f1d486d9aa81.webp",
+        "productType": "simple",
+        "_id": "6a86d1ba11dbe11460846b9b"
+      }
+    ],
+    "subtotal": 3400,
+    "deliveryCharge": 0,
+    "discountAmount": 0,
+    "total": 3400,
+    "status": "Pending",
+    "paymentMethod": "Cash on Delivery (COD)",
+    "shippingAddress": {
+      "fullName": "Zahidiqbal Iqbal",
+      "street": "Old Jang building near mareer chok rawlpindi",
+      "city": "Rawlpindi",
+      "state": "Punjab",
+      "postalCode": "051",
+      "phone": "03069368892",
+      "country": "Pakistan"
+    },
+    "checkoutRequestId": "443587a5-ecea-4219-b205-62e108f437e8",
+    "date": "2026-08-20",
+    "newOrderEmailRecipients": [
+      "sales@playbimboo.com",
+      "abraransarise@gmail.com"
+    ],
+    "createdAt": "2026-08-20T10:06:50.260Z",
+    "updatedAt": "2026-08-20T10:06:53.189Z",
+    "__v": 1,
+    "confirmationEmailAccepted": true,
+    "confirmationEmailMessageId": "<95eb4493-07af-663c-17ee-42fce6ba15d0@playbimboo.com>",
+    "confirmationEmailSentAt": "2026-08-20T10:06:51.781Z",
+    "newOrderEmailAttemptedAt": "2026-08-20T10:06:51.972Z",
+    "newOrderEmailMessageId": "<5acbe38a-e0b4-aaad-0a56-4b924c252981@playbimboo.com>",
+    "newOrderEmailSentAt": "2026-08-20T10:06:53.188Z"
+  },
+  {
+    "_id": "6a870e51544d0c2fa2301631",
+    "userId": "6a870e4f544d0c2fa230162f",
+    "orderId": "ORD-MT1M4DDS-KPVG",
+    "customerName": "Raja Mustafa",
+    "email": "rajaamirjee1234@gmail.com.pk",
+    "phone": "03061329215",
+    "items": [
+      {
+        "productId": "6a79d8595697f0b996c0c0f5",
+        "name": "2.4GHz Cyclone Stunt RC Fighter Drone",
+        "price": 3400,
+        "quantity": 1,
+        "image": "https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786454964/playbimboo/products/b8a2587d-cb0f-439e-a085-f1d486d9aa81.webp",
+        "productType": "simple",
+        "_id": "6a870e51544d0c2fa2301632"
+      }
+    ],
+    "subtotal": 3400,
+    "deliveryCharge": 0,
+    "discountAmount": 0,
+    "total": 3400,
+    "status": "Pending",
+    "paymentMethod": "Cash on Delivery (COD)",
+    "shippingAddress": {
+      "fullName": "Raja Mustafa",
+      "street": "Tasil Mianchanu Distric Khanewal",
+      "city": "mian channu",
+      "state": "punjab",
+      "postalCode": "",
+      "phone": "03061329215",
+      "country": "Pakistan"
+    },
+    "checkoutRequestId": "53d7e18e-5451-471e-b6e0-dc1fa601ab6d",
+    "date": "2026-08-20",
+    "newOrderEmailRecipients": [
+      "sales@playbimboo.com",
+      "abraransarise@gmail.com"
+    ],
+    "createdAt": "2026-08-20T14:25:21.439Z",
+    "updatedAt": "2026-08-20T14:25:24.371Z",
+    "__v": 1,
+    "confirmationEmailAccepted": true,
+    "confirmationEmailMessageId": "<46b5d6ae-94bb-9536-afea-331f399cd9da@playbimboo.com>",
+    "confirmationEmailSentAt": "2026-08-20T14:25:22.957Z",
+    "newOrderEmailAttemptedAt": "2026-08-20T14:25:23.148Z",
+    "newOrderEmailMessageId": "<96e1d844-ce8c-be61-0185-02fd404d35b3@playbimboo.com>",
+    "newOrderEmailSentAt": "2026-08-20T14:25:24.370Z"
+  }
+]

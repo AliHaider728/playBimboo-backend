@@ -1,0 +1,44 @@
+[
+  {
+    "_id": "6a6c7a0988a0555170351969",
+    "name": "STEM & Robotics",
+    "slug": "stem-robotics",
+    "iconName": "Cpu",
+    "image": "https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&w=600&q=80",
+    "description": "Interactive science kits, coding robots, and circuit boards for young engineers.",
+    "itemCount": 28,
+    "__v": 0,
+    "createdAt": "2026-07-31T10:33:45.653Z",
+    "updatedAt": "2026-07-31T10:33:45.653Z"
+  },
+  {
+    "_id": "6a6c7a0988a0555170351968",
+    "name": "Building Sets & Blocks",
+    "slug": "building-sets",
+    "iconName": "Boxes",
+    "image": "https://images.unsplash.com/photo-1587654780291-39c9404d746b?auto=format&fit=crop&w=600&q=80",
+    "description": "Constructive building bricks, architectural blocks, and magnetic tiles to spark creativity.",
+    "itemCount": 42,
+    "__v": 0,
+    "createdAt": "2026-07-31T10:33:45.652Z",
+    "updatedAt": "2026-07-31T10:33:45.652Z"
+  },
+  {
+    "_id": "6a79beaa193025d28bc0b18f",
+    "name": "Rc Toys",
+    "slug": "rc-toys",
+    "iconName": "Boxes",
+    "image": "",
+    "shortDescription": "",
+    "itemCount": 0,
+    "isActive": true,
+    "isFeatured": false,
+    "showInNavigation": true,
+    "displayOrder": 2,
+    "desktopVisible": true,
+    "mobileVisible": true,
+    "createdAt": "2026-08-10T12:06:02.342Z",
+    "updatedAt": "2026-08-10T12:06:02.342Z",
+    "__v": 0
+  }
+]
