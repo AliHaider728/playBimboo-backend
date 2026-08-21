@@ -39,6 +39,42 @@ function generateOrderId() {
   return 'PB-' + Date.now().toString(36).toUpperCase() + '-' + crypto.randomBytes(3).toString('hex').toUpperCase();
 }
 
+
+// Map MySQL order structure to match the old MongoDB schema expected by the frontend
+function mapOrderForFrontend(o: any) {
+  const shipAddr = typeof o.shippingAddress === 'string' ? JSON.parse(o.shippingAddress) : (o.shippingAddress || {});
+  
+  let dateStr = o.date;
+  if (!dateStr && o.createdAt) {
+    const d = new Date(o.createdAt);
+    if (!isNaN(d.getTime())) {
+      dateStr = d.toISOString().split('T')[0];
+    }
+  }
+
+  const mappedItems = (o.items || []).map((item: any) => ({
+    ...item,
+    name: item.productName || item.name,
+    price: Number(item.price || 0),
+    quantity: Number(item.quantity || 1)
+  }));
+
+  return {
+    ...o,
+    shippingAddress: shipAddr,
+    customerName: o.customerName || shipAddr.fullName || shipAddr.name || o.guestEmail || 'Customer',
+    email: o.guestEmail || o.email,
+    phone: o.guestPhone || o.phone || shipAddr.phone,
+    date: dateStr,
+    total: Number(o.total || 0),
+    subtotal: Number(o.subtotal || 0),
+    shippingFee: Number(o.shippingFee || 0),
+    deliveryCharge: Number(o.shippingFee || 0),
+    discountAmount: Number(o.discountAmount || 0),
+    items: mappedItems
+  };
+}
+
 // GET all orders (admin sees all, customers see only their own)
 router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
@@ -60,7 +96,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
     const [orders] = await pool.execute(sql, params);
 
     // Attach items to each order
-    const ordersArr = orders as any[];
+    let ordersArr = orders as any[];
     if (ordersArr.length > 0) {
       const orderIds = ordersArr.map(o => o.id);
       const placeholders = orderIds.map(() => '?').join(',');
@@ -70,7 +106,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
         if (!itemsMap.has(item.order_id)) itemsMap.set(item.order_id, []);
         itemsMap.get(item.order_id)!.push(item);
       });
-      ordersArr.forEach(o => {
+      ordersArr = ordersArr.map(o => {
         o.items = itemsMap.get(o.id) || [];
         o.shippingAddress = typeof o.shippingAddress === 'string' ? JSON.parse(o.shippingAddress) : o.shippingAddress;
       });
@@ -96,7 +132,7 @@ router.get('/:orderId', authenticateToken, async (req: AuthRequest, res: Respons
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    res.json(order);
+    res.json(mapOrderForFrontend(order));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -324,7 +360,7 @@ router.put('/:orderId/status', authenticateToken, requireAdmin, async (req: Requ
     await conn.commit();
 
     let updatedOrder = await getFullOrder(pool, req.params.orderId);
-    if (updatedOrder) updatedOrder = { ...updatedOrder, email: updatedOrder.guestEmail, phone: updatedOrder.guestPhone, customerName: updatedOrder.shippingAddress?.name };
+    if (updatedOrder) updatedOrder = mapOrderForFrontend(updatedOrder);
 
     // Fire status email (non-blocking)
     if (previousStatus !== status && updatedOrder?.guestEmail) {
@@ -349,7 +385,8 @@ router.put('/:orderId/tracking', authenticateToken, requireAdmin, async (req: Re
       [trackingNumber, new Date(), req.params.orderId]
     );
     if ((result as any).affectedRows === 0) return res.status(404).json({ error: 'Order not found' });
-    res.json(await getFullOrder(pool, req.params.orderId));
+    const updated = await getFullOrder(pool, req.params.orderId);
+    res.json(updated ? mapOrderForFrontend(updated) : null);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }

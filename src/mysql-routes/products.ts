@@ -67,6 +67,13 @@ async function enrichProduct(conn: any, p: any) {
 
   return {
     ...p,
+    price: Number(p.price || 0),
+    originalPrice: p.originalPrice != null ? Number(p.originalPrice) : null,
+    discountPercent: Number(p.discountPercent || 0),
+    stockQuantity: p.stockQuantity != null ? Number(p.stockQuantity) : null,
+    lowStockThreshold: p.lowStockThreshold != null ? Number(p.lowStockThreshold) : null,
+    rating: Number(p.rating || 0),
+    reviewsCount: Number(p.reviewsCount || 0),
     images: imgs.filter(i => !i.isThumbnail).map(i => i.url),
     imageThumbnailUrls: imgs.filter(i => i.isThumbnail).map(i => i.url),
     imagePublicIds: imgs.map(i => i.publicId).filter(Boolean),
@@ -75,6 +82,10 @@ async function enrichProduct(conn: any, p: any) {
     categorySlugs,
     variations: (variants as any[]).map(v => ({
       ...v,
+      regularPrice: Number(v.regularPrice || 0),
+      salePrice: v.salePrice != null ? Number(v.salePrice) : null,
+      stockQuantity: v.stockQuantity != null ? Number(v.stockQuantity) : null,
+      weight: v.weight != null ? Number(v.weight) : null,
       attributes: parseJson(v.attributes, {}),
       image: parseJson(v.image, null)
     })),
