@@ -151,9 +151,9 @@ router.post('/', async (req: Request, res: Response) => {
       await conn.rollback();
       return res.status(400).json({ error: 'Order must contain at least one product' });
     }
-    if (!email || !customerName || !phone) {
+    if (!customerName || !phone) {
       await conn.rollback();
-      return res.status(400).json({ error: 'Customer name, email, and phone are required' });
+      return res.status(400).json({ error: 'Customer name and phone are required' });
     }
 
     // Idempotency: check if this request was already processed
@@ -234,7 +234,7 @@ router.post('/', async (req: Request, res: Response) => {
       `INSERT INTO orders (id, orderId, guestEmail, guestPhone, total, subtotal, shippingFee, discountAmount, status, paymentMethod, shippingAddress, appliedCoupon, checkoutRequestId, createdAt, updatedAt)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        internalId, orderId, email.trim().toLowerCase(), phone,
+        internalId, orderId, email ? email.trim().toLowerCase() : null, phone,
         total, computedSubtotal, shippingFee, discount,
         'Pending', 'COD',
         JSON.stringify(shippingAddress || {}),
