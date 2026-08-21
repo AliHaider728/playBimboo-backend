@@ -90,6 +90,7 @@ async function enrichProduct(conn: any, p: any) {
       image: parseJson(v.image, null)
     })),
     // Parse all JSON columns
+    variants: parseJson(p.variants, []),
     features: parseJson(p.features, []),
     tags: parseJson(p.tags, []),
     specifications: parseJson(p.specifications, {}),
@@ -261,8 +262,8 @@ router.post('/', authenticateToken, requireAdmin, async (req: AuthRequest, res: 
         isVisible, status, displayOrder, isFeatured, isBestseller, isNewArrival, isSpotlight, 
         weight, deliveryType, customDeliveryFee, shortDescription, description, 
         features, safetyInfo, specifications, tags, metaTitle, metaDescription, 
-        productDetailBlocks, pricingOffers, defaultAttributes, defaultVariationId, productType, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        productDetailBlocks, pricingOffers, defaultAttributes, defaultVariationId, productType, variants, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id, sanitizePlain(body.name, 200), slug, sanitizePlain(body.sku, 80).toUpperCase() || null,
         price, originalPrice, discountPercent,
@@ -293,6 +294,7 @@ router.post('/', authenticateToken, requireAdmin, async (req: AuthRequest, res: 
         JSON.stringify(body.defaultAttributes || {}),
         body.defaultVariationId || null,
         body.productType === 'variable' ? 'variable' : 'simple',
+        JSON.stringify(body.variants || []),
         now, now
       ]
     );
@@ -393,7 +395,7 @@ router.put('/:id', authenticateToken, requireAdmin, async (req: AuthRequest, res
         isVisible = ?, status = ?, displayOrder = ?, isFeatured = ?, isBestseller = ?, isNewArrival = ?, isSpotlight = ?,
         weight = ?, deliveryType = ?, customDeliveryFee = ?, shortDescription = ?, description = ?,
         features = ?, safetyInfo = ?, specifications = ?, tags = ?, metaTitle = ?, metaDescription = ?,
-        productDetailBlocks = ?, pricingOffers = ?, defaultAttributes = ?, defaultVariationId = ?, productType = ?, updatedAt = ?
+        productDetailBlocks = ?, pricingOffers = ?, defaultAttributes = ?, defaultVariationId = ?, productType = ?, variants = ?, updatedAt = ?
        WHERE id = ?`,
       [
         sanitizePlain(body.name, 200), slug, sanitizePlain(body.sku, 80).toUpperCase() || null,
@@ -423,6 +425,7 @@ router.put('/:id', authenticateToken, requireAdmin, async (req: AuthRequest, res
         JSON.stringify(body.defaultAttributes || {}),
         body.defaultVariationId || null,
         body.productType === 'variable' ? 'variable' : 'simple',
+        JSON.stringify(body.variants || []),
         now, req.params.id
       ]
     );
