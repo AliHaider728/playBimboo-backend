@@ -196,18 +196,14 @@ router.post('/', async (req: Request, res: Response) => {
 
       const qty = Number(item.quantity);
       const stock = Number(product.stockQuantity);
-      const tracks = product.trackInventory === 1 || product.trackInventory === true;
+      const tracks = product.trackInventory === 1 || product.trackInventory === true || product.trackInventory === '1';
 
-      if (product.inStock === 0 || !product.inStock) {
-        await conn.rollback();
-        return res.status(400).json({ error: `${product.name} is out of stock` });
+      if (tracks) {
+        if (product.inStock === 0 || product.inStock === false || stock < qty) {
+          await conn.rollback();
+          return res.status(400).json({ error: `${product.name} does not have enough stock (available: ${stock}, requested: ${qty})` });
+        }
       }
-
-      if (tracks && stock < qty) {
-        await conn.rollback();
-        return res.status(400).json({ error: `${product.name} does not have enough stock (available: ${stock}, requested: ${qty})` });
-      }
-
       const unitPrice = Number(item.price || product.price);
       computedSubtotal += unitPrice * qty;
 
