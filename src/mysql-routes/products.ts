@@ -36,72 +36,65 @@ async function getFullProduct(conn: any, idOrSlug: string, adminRead = false) {
   );
   if ((rows as any[]).length === 0) return null;
   const p = (rows as any[])[0];
-  return enrichProduct(conn, p);
-}
-
-async function enrichProduct(conn: any, p: any) {
-  const [images] = await conn.execute(
-    'SELECT * FROM product_images WHERE product_id = ? ORDER BY position ASC', [p.id]
-  );
-  const [pcats] = await conn.execute(
-    'SELECT category_id FROM product_categories WHERE product_id = ?', [p.id]
-  );
-  const [variants] = await conn.execute(
-    'SELECT * FROM product_variants WHERE product_id = ?', [p.id]
-  );
-
-  const imgs = images as any[];
-  const catIds = (pcats as any[]).map(r => r.category_id);
-
-  // Fetch category names for enrichment
-  let categoryNames: string[] = [];
-  let categorySlugs: string[] = [];
-  if (catIds.length > 0) {
-    const placeholders = catIds.map(() => '?').join(',');
-    const [catRows] = await conn.execute(
-      `SELECT id, name, slug FROM categories WHERE id IN (${placeholders})`, catIds
-    );
-    categoryNames = (catRows as any[]).map(c => c.name);
-    categorySlugs = (catRows as any[]).map(c => c.slug);
-  }
-
-  return {
-    ...p,
-    price: Number(p.price || 0),
-    originalPrice: p.originalPrice != null ? Number(p.originalPrice) : null,
-    discountPercent: Number(p.discountPercent || 0),
-    stockQuantity: p.stockQuantity != null ? Number(p.stockQuantity) : null,
-    lowStockThreshold: p.lowStockThreshold != null ? Number(p.lowStockThreshold) : null,
-    rating: Number(p.rating || 0),
-    reviewsCount: Number(p.reviewsCount || 0),
-    images: imgs.filter(i => !i.isThumbnail).map(i => i.url),
-    imageThumbnailUrls: imgs.filter(i => i.isThumbnail).map(i => i.url),
-    imagePublicIds: imgs.map(i => i.publicId).filter(Boolean),
-    categoryIds: catIds,
-    categoryNames,
-    categorySlugs,
-    variations: (variants as any[]).map(v => ({
-      ...v,
-      regularPrice: Number(v.regularPrice || 0),
-      salePrice: v.salePrice != null ? Number(v.salePrice) : null,
-      stockQuantity: v.stockQuantity != null ? Number(v.stockQuantity) : null,
-      weight: v.weight != null ? Number(v.weight) : null,
-      attributes: parseJson(v.attributes, {}),
-      image: parseJson(v.image, null)
-    })),
-    // Parse all JSON columns
-    variants: parseJson(p.variants, []),
-    features: parseJson(p.features, []),
-    tags: parseJson(p.tags, []),
-    specifications: parseJson(p.specifications, {}),
-    productDetailBlocks: parseJson(p.productDetailBlocks, []),
-    pricingOffers: parseJson(p.pricingOffers, null),
-    defaultAttributes: parseJson(p.defaultAttributes, {})
-  };
+  const enriched = await enrichProducts(conn, [p]);
+  return enriched[0] || null;
 }
 
 async function enrichProducts(conn: any, products: any[]) {
-  return Promise.all(products.map(p => enrichProduct(conn, p)));
+  if (!products || products.length === 0) return [];
+  const productIds = products.map(p => p.id);
+  const placeholders = productIds.map(() => '?').join(',');
+
+  const [images] = await conn.execute(`SELECT * FROM product_images WHERE product_id IN (${placeholders}) ORDER BY product_id, position ASC`, productIds);
+  const [pcats] = await conn.execute(`SELECT pc.product_id, c.id, c.name, c.slug FROM product_categories pc JOIN categories c ON pc.category_id = c.id WHERE pc.product_id IN (${placeholders})`, productIds);
+  const [variants] = await conn.execute(`SELECT * FROM product_variants WHERE product_id IN (${placeholders})`, productIds);
+
+  const imagesByProduct = new Map();
+  const categoriesByProduct = new Map();
+  const variantsByProduct = new Map();
+
+  (images as any[]).forEach(row => { if (!imagesByProduct.has(row.product_id)) imagesByProduct.set(row.product_id, []); imagesByProduct.get(row.product_id).push(row); });
+  (pcats as any[]).forEach(row => { if (!categoriesByProduct.has(row.product_id)) categoriesByProduct.set(row.product_id, []); categoriesByProduct.get(row.product_id).push(row); });
+  (variants as any[]).forEach(row => { if (!variantsByProduct.has(row.product_id)) variantsByProduct.set(row.product_id, []); variantsByProduct.get(row.product_id).push(row); });
+
+  return products.map(p => {
+    const imgs = imagesByProduct.get(p.id) || [];
+    const cats = categoriesByProduct.get(p.id) || [];
+    const vars = variantsByProduct.get(p.id) || [];
+
+    return {
+      ...p,
+      price: Number(p.price || 0),
+      originalPrice: p.originalPrice != null ? Number(p.originalPrice) : null,
+      discountPercent: Number(p.discountPercent || 0),
+      stockQuantity: p.stockQuantity != null ? Number(p.stockQuantity) : null,
+      lowStockThreshold: p.lowStockThreshold != null ? Number(p.lowStockThreshold) : null,
+      rating: Number(p.rating || 0),
+      reviewsCount: Number(p.reviewsCount || 0),
+      images: imgs.filter((i: any) => !i.isThumbnail).length > 0 ? imgs.filter((i: any) => !i.isThumbnail).map((i: any) => i.url) : imgs.map((i: any) => i.url),
+      imageThumbnailUrls: imgs.filter((i: any) => i.isThumbnail).length > 0 ? imgs.filter((i: any) => i.isThumbnail).map((i: any) => i.url) : imgs.map((i: any) => i.url),
+      imagePublicIds: imgs.map((i: any) => i.publicId).filter(Boolean),
+      categoryIds: cats.map((c: any) => c.id),
+      categoryNames: cats.map((c: any) => c.name),
+      categorySlugs: cats.map((c: any) => c.slug),
+      variations: vars.map((v: any) => ({
+        ...v,
+        regularPrice: Number(v.regularPrice || 0),
+        salePrice: v.salePrice != null ? Number(v.salePrice) : null,
+        stockQuantity: v.stockQuantity != null ? Number(v.stockQuantity) : null,
+        weight: v.weight != null ? Number(v.weight) : null,
+        attributes: parseJson(v.attributes, {}),
+        image: parseJson(v.image, null)
+      })),
+      variants: parseJson(p.variants, []),
+      features: parseJson(p.features, []),
+      tags: parseJson(p.tags, []),
+      specifications: parseJson(p.specifications, {}),
+      productDetailBlocks: parseJson(p.productDetailBlocks, []),
+      pricingOffers: parseJson(p.pricingOffers, null),
+      defaultAttributes: parseJson(p.defaultAttributes, {})
+    };
+  });
 }
 
 // ─── Routes ─────────────────────────────────────────────────────────────────
@@ -109,9 +102,9 @@ async function enrichProducts(conn: any, products: any[]) {
 // GET all products
 router.get('/', authenticateIfPresent, async (req: AuthRequest, res: Response) => {
   try {
-    res.set('Cache-Control', 'no-store, max-age=0');
-    const { category, search, isVisible, limit } = req.query;
     const adminRead = ['admin', 'super_admin'].includes(req.user?.role || '');
+    if (adminRead) { res.set('Cache-Control', 'no-store, max-age=0'); } else { res.set('Cache-Control', 'public, max-age=30, s-maxage=60, stale-while-revalidate=300'); }
+    const { category, search, isVisible, limit } = req.query;
 
     const clauses: string[] = [];
     const params: any[] = [];
@@ -149,6 +142,7 @@ router.get('/', authenticateIfPresent, async (req: AuthRequest, res: Response) =
 // GET related products
 router.get('/:idOrSlug/related', authenticateIfPresent, async (req: AuthRequest, res: Response) => {
   try {
+    res.set('Cache-Control', 'public, max-age=30, s-maxage=60, stale-while-revalidate=300');
     const product = await getFullProduct(pool, req.params.idOrSlug);
     if (!product) return res.status(404).json({ error: 'Product not found' });
 
@@ -184,8 +178,8 @@ router.get('/:idOrSlug/related', authenticateIfPresent, async (req: AuthRequest,
 // GET single product by slug or ID
 router.get('/:idOrSlug', authenticateIfPresent, async (req: AuthRequest, res: Response) => {
   try {
-    res.set('Cache-Control', 'no-store, max-age=0');
     const adminRead = ['admin', 'super_admin'].includes(req.user?.role || '');
+    if (adminRead) { res.set('Cache-Control', 'no-store, max-age=0'); } else { res.set('Cache-Control', 'public, max-age=30, s-maxage=60, stale-while-revalidate=300'); }
     const product = await getFullProduct(pool, req.params.idOrSlug, adminRead);
     if (!product) return res.status(404).json({ error: 'Product not found' });
     res.json(product);

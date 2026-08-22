@@ -78,21 +78,58 @@ function mapOrderForFrontend(o: any) {
 // GET all orders (admin sees all, customers see only their own)
 router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
-    const { email } = req.query;
+    const { email, page, limit, search, status } = req.query;
+    const isAdmin = ['admin', 'super_admin'].includes(req.user?.role || '');
+    
     let sql = 'SELECT * FROM orders';
+    let countSql = 'SELECT COUNT(*) as count FROM orders';
     const params: any[] = [];
+    const conditions: string[] = [];
 
-    if (['admin', 'super_admin'].includes(req.user?.role || '')) {
+    if (isAdmin) {
       if (typeof email === 'string' && email.trim()) {
-        sql += ' WHERE guestEmail = ?';
+        conditions.push('guestEmail = ?');
         params.push(email.trim().toLowerCase());
       }
+      if (typeof status === 'string' && status !== 'all' && status.trim()) {
+        conditions.push('status = ?');
+        params.push(status.trim());
+      }
+      if (typeof search === 'string' && search.trim()) {
+        conditions.push('(orderId LIKE ? OR guestEmail LIKE ? OR customerName LIKE ?)');
+        const searchStr = `%${search.trim()}%`;
+        params.push(searchStr, searchStr, searchStr);
+      }
     } else {
-      sql += ' WHERE user_id = ?';
+      conditions.push('user_id = ?');
       params.push(req.user?.userId);
     }
 
+    if (conditions.length > 0) {
+      const whereClause = ' WHERE ' + conditions.join(' AND ');
+      sql += whereClause;
+      countSql += whereClause;
+    }
+
     sql += ' ORDER BY createdAt DESC';
+
+    const isPaginated = isAdmin && (page || limit || search || status);
+    
+    let pageNum = 1;
+    let limitNum = 50;
+    let totalCount = 0;
+    
+    if (isPaginated) {
+      pageNum = Math.max(1, parseInt(page as string) || 1);
+      limitNum = Math.max(1, parseInt(limit as string) || 25);
+      const offset = (pageNum - 1) * limitNum;
+      
+      const [countRows] = await pool.execute(countSql, params);
+      totalCount = (countRows as any)[0].count;
+      
+      sql += ` LIMIT ${limitNum} OFFSET ${offset}`;
+    }
+
     const [orders] = await pool.execute(sql, params);
 
     // Attach items to each order
@@ -113,7 +150,16 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
       });
     }
 
-    res.json(ordersArr);
+    if (isPaginated) {
+      res.json({
+        orders: ordersArr,
+        totalCount,
+        page: pageNum,
+        totalPages: Math.ceil(totalCount / limitNum)
+      });
+    } else {
+      res.json(ordersArr);
+    }
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -286,7 +332,17 @@ router.post('/', async (req: Request, res: Response) => {
     const metaEventId = `purchase_${orderId}`;
 
     void (async () => {
-      try { await sendOrderConfirmationEmail(newOrder, {}); } catch (e) { logEmailFailure('Order confirmation', orderId, e); }
+      try { 
+        await sendOrderConfirmationEmail(newOrder, {}); 
+        const bgConn = await pool.getConnection();
+        await bgConn.execute('UPDATE orders SET confirmationEmailSentAt = NOW(), confirmationEmailAccepted = 1 WHERE orderId = ?', [orderId]);
+        bgConn.release();
+      } catch (e) { 
+        logEmailFailure('Order confirmation', orderId, e); 
+        const bgConn = await pool.getConnection();
+        await bgConn.execute('UPDATE orders SET confirmationEmailAccepted = 0 WHERE orderId = ?', [orderId]);
+        bgConn.release();
+      }
       try {
         const recipients = getAdminNotificationRecipients();
         if (recipients.length > 0) await sendAdminNewOrderEmail(newOrder, recipients);
@@ -395,9 +451,24 @@ router.put('/:orderId/tracking', authenticateToken, requireAdmin, async (req: Re
 // DELETE Order (Admin)
 router.delete('/:orderId', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
-    const [result] = await pool.execute('DELETE FROM orders WHERE orderId = ?', [req.params.orderId]);
-    if ((result as any).affectedRows === 0) return res.status(404).json({ error: 'Order not found' });
-    res.json({ message: 'Order deleted successfully' });
+    const [orderRows] = await pool.execute('SELECT id FROM orders WHERE orderId = ?', [req.params.orderId]);
+    if ((orderRows as any[]).length === 0) return res.status(404).json({ error: 'Order not found' });
+    const orderIdInternal = (orderRows as any[])[0].id;
+
+    const conn = await pool.getConnection();
+    await conn.beginTransaction();
+    try {
+      await conn.execute('DELETE FROM order_items WHERE order_id = ?', [orderIdInternal]);
+      await conn.execute('DELETE FROM order_status_history WHERE order_id = ?', [orderIdInternal]);
+      await conn.execute('DELETE FROM orders WHERE id = ?', [orderIdInternal]);
+      await conn.commit();
+      res.json({ message: 'Order deleted successfully' });
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
