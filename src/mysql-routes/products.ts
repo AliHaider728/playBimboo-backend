@@ -28,7 +28,7 @@ const parseJson = (v: any, fallback: any = null) => {
 };
 
 // ─── Explicit column lists (no SELECT *) ────────────────────────────────────
-const PRODUCT_COL_LIST = ['id','name','slug','sku','price','originalPrice','discountPercent','rating','reviewCount','categoryId','brand','inStock','trackInventory','stockQuantity','stockStatus','lowStockThreshold','isVisible','status','displayOrder','isFeatured','isBestseller','isNewArrival','isSpotlight','weight','deliveryType','customDeliveryFee','shortDescription','description','features','safetyInfo','specifications','tags','metaTitle','metaDescription','productDetailBlocks','pricingOffers','defaultAttributes','defaultVariationId','productType','createdAt','updatedAt','variants'];
+const PRODUCT_COL_LIST = ['id','name','slug','sku','price','originalPrice','discountPercent','rating','reviewCount','categoryId','brand','inStock','trackInventory','stockQuantity','stockStatus','lowStockThreshold','isVisible','status','displayOrder','isFeatured','isBestseller','isNewArrival','isSpotlight','weight','deliveryType','customDeliveryFee','shortDescription','description','features','safetyInfo','specifications','tags','metaTitle','metaDescription','productDetailBlocks','productDetailCustomCss','pricingOffers','defaultAttributes','defaultVariationId','productType','createdAt','updatedAt','variants'];
 const PRODUCT_COLS = PRODUCT_COL_LIST.join(', ');
 const PRODUCT_COLS_P = PRODUCT_COL_LIST.map(c => `p.${c}`).join(', ');
 
@@ -258,14 +258,16 @@ router.post('/', authenticateToken, requireAdmin, async (req: AuthRequest, res: 
 
     const description = sanitizeProductDescription(body.description || '');
 
+    const customCss = body.productDetailCustomCss ? String(body.productDetailCustomCss).slice(0, 10000) : null;
+
     await conn.execute(
       `INSERT INTO products (id, name, slug, sku, price, originalPrice, discountPercent, 
         categoryId, brand, inStock, trackInventory, stockQuantity, stockStatus, lowStockThreshold, 
         isVisible, status, displayOrder, isFeatured, isBestseller, isNewArrival, isSpotlight, 
         weight, deliveryType, customDeliveryFee, shortDescription, description, 
         features, safetyInfo, specifications, tags, metaTitle, metaDescription, 
-        productDetailBlocks, pricingOffers, defaultAttributes, defaultVariationId, productType, variants, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        productDetailBlocks, productDetailCustomCss, pricingOffers, defaultAttributes, defaultVariationId, productType, variants, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id, sanitizePlain(body.name, 200), slug, sanitizePlain(body.sku, 80).toUpperCase() || null,
         price, originalPrice, discountPercent,
@@ -292,6 +294,7 @@ router.post('/', authenticateToken, requireAdmin, async (req: AuthRequest, res: 
         sanitizePlain(body.metaTitle, 70),
         sanitizePlain(body.metaDescription, 180),
         JSON.stringify(productDetailBlocks),
+        customCss,
         JSON.stringify(body.pricingOffers || null),
         JSON.stringify(body.defaultAttributes || {}),
         body.defaultVariationId || null,
@@ -391,13 +394,15 @@ router.put('/:id', authenticateToken, requireAdmin, async (req: AuthRequest, res
     let productDetailBlocks: any[] = [];
     try { productDetailBlocks = normalizeProductDetailBlocks(body.productDetailBlocks); } catch { productDetailBlocks = []; }
 
+    const customCss = typeof body.productDetailCustomCss === 'string' ? String(body.productDetailCustomCss).slice(0, 10000) : current.productDetailCustomCss;
+
     await conn.execute(
       `UPDATE products SET name = ?, slug = ?, sku = ?, price = ?, originalPrice = ?, discountPercent = ?,
         categoryId = ?, brand = ?, inStock = ?, trackInventory = ?, stockQuantity = ?, stockStatus = ?, lowStockThreshold = ?,
         isVisible = ?, status = ?, displayOrder = ?, isFeatured = ?, isBestseller = ?, isNewArrival = ?, isSpotlight = ?,
         weight = ?, deliveryType = ?, customDeliveryFee = ?, shortDescription = ?, description = ?,
         features = ?, safetyInfo = ?, specifications = ?, tags = ?, metaTitle = ?, metaDescription = ?,
-        productDetailBlocks = ?, pricingOffers = ?, defaultAttributes = ?, defaultVariationId = ?, productType = ?, variants = ?, updatedAt = ?
+        productDetailBlocks = ?, productDetailCustomCss = ?, pricingOffers = ?, defaultAttributes = ?, defaultVariationId = ?, productType = ?, variants = ?, updatedAt = ?
        WHERE id = ?`,
       [
         sanitizePlain(body.name, 200), slug, sanitizePlain(body.sku, 80).toUpperCase() || null,
@@ -423,6 +428,7 @@ router.put('/:id', authenticateToken, requireAdmin, async (req: AuthRequest, res
         JSON.stringify(Array.isArray(body.tags) ? body.tags : []),
         sanitizePlain(body.metaTitle, 70), sanitizePlain(body.metaDescription, 180),
         JSON.stringify(productDetailBlocks),
+        customCss,
         JSON.stringify(body.pricingOffers || null),
         JSON.stringify(body.defaultAttributes || {}),
         body.defaultVariationId || null,
