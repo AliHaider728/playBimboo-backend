@@ -364,6 +364,10 @@ router.post('/', authenticateToken, requireAdmin, async (req: AuthRequest, res: 
 
 // PUT Update Product
 router.put('/:id', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+  console.log('--- Incoming PUT request for product:', req.params.id);
+  console.log('productDetailCustomCss in req.body:', req.body.productDetailCustomCss);
+  console.log('Keys in req.body:', Object.keys(req.body));
+  
   const conn = await pool.getConnection();
   await conn.beginTransaction();
 
