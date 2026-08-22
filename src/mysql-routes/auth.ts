@@ -8,6 +8,10 @@ import { sendPasswordResetEmail } from '../utils/mailer.js';
 
 const router = Router();
 
+// ─── Explicit column lists (no SELECT *) ────────────────────────────────────
+const USER_COLS_AUTH = 'id, name, email, passwordHash, role, wishlist, resetPasswordToken, resetPasswordExpires, createdAt, updatedAt';
+const USER_COLS_SAFE = 'id, name, email, role, wishlist, createdAt, updatedAt';
+
 // Helper to convert DB rows to public User objects
 const toPublicUser = (row: any) => {
   return {
@@ -64,7 +68,7 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
-    const [rows] = await pool.execute('SELECT * FROM users WHERE email = ?', [normalizedEmail]);
+    const [rows] = await pool.execute(`SELECT ${USER_COLS_AUTH} FROM users WHERE email = ?`, [normalizedEmail]);
     if ((rows as any[]).length === 0) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
@@ -120,7 +124,7 @@ router.post('/logout', (req: Request, res: Response) => {
 // GET /me
 router.get('/me', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
-    const [rows] = await pool.execute('SELECT * FROM users WHERE id = ?', [req.user!.userId]);
+    const [rows] = await pool.execute(`SELECT ${USER_COLS_SAFE} FROM users WHERE id = ?`, [req.user!.userId]);
     if ((rows as any[]).length === 0) return res.status(404).json({ error: 'User not found' });
     res.json(toPublicUser((rows as any[])[0]));
   } catch (err: any) {
@@ -150,7 +154,7 @@ router.post('/wishlist', authenticateToken, async (req: AuthRequest, res: Respon
 // GET /users (Admin)
 router.get('/users', authenticateToken, requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
-    const [rows] = await pool.execute('SELECT * FROM users ORDER BY createdAt DESC');
+    const [rows] = await pool.execute(`SELECT ${USER_COLS_SAFE} FROM users ORDER BY createdAt DESC`);
     res.json((rows as any[]).map(toPublicUser));
   } catch (err: any) {
     res.status(500).json({ error: err.message });

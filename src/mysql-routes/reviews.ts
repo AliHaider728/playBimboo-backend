@@ -4,6 +4,10 @@ import { authenticateToken, requireAdmin, AuthRequest } from '../middleware/auth
 import sanitizeHtml from 'sanitize-html';
 import crypto from 'crypto';
 
+// ─── Explicit column lists (no SELECT *) ────────────────────────────────────
+const REVIEW_COLS_PUBLIC = 'id, productId, productName, reviewerName, reviewerEmail, rating, title, content, avatarUrl, imageUrl, imagePublicId, verifiedPurchase, source, status, approvedAt, createdAt, updatedAt';
+const REVIEW_COLS_ADMIN = 'id, productId, productName, reviewerName, reviewerEmail, rating, title, content, avatarUrl, imageUrl, imagePublicId, verifiedPurchase, source, status, userId, orderId, approvedAt, approvedBy, createdAt, updatedAt';
+
 const router = Router();
 
 // Recalculate and update a product's review summary stats (mirrors productReviews.ts logic)
@@ -40,7 +44,7 @@ router.get('/product/:productId', async (req: Request, res: Response) => {
   try {
     const { productId } = req.params;
     const [reviews] = await pool.execute(
-      'SELECT * FROM reviews WHERE productId = ? AND status = "approved" ORDER BY createdAt DESC',
+      `SELECT ${REVIEW_COLS_PUBLIC} FROM reviews WHERE productId = ? AND status = "approved" ORDER BY createdAt DESC`,
       [productId]
     );
     res.json(reviews);
@@ -72,7 +76,7 @@ router.post('/', async (req: Request, res: Response) => {
       [id, productId, productName || '', reviewerName, reviewerEmail || null, Number(rating), title || null, sanitizedContent, 'pending', 'customer', 0, now, now]
     );
 
-    const [rows] = await pool.execute('SELECT * FROM reviews WHERE id = ?', [id]);
+    const [rows] = await pool.execute(`SELECT ${REVIEW_COLS_PUBLIC} FROM reviews WHERE id = ?`, [id]);
     res.status(201).json({
       message: 'Thank you! Your review has been submitted and will appear after approval.',
       review: (rows as any[])[0]
@@ -104,7 +108,7 @@ router.get('/admin', authenticateToken, requireAdmin, async (req: Request, res: 
     const skip = (Number(page) - 1) * Number(limit);
 
     const [reviews] = await pool.execute(
-      `SELECT r.*, p.slug as productSlug
+      `SELECT ${REVIEW_COLS_ADMIN.split(', ').map(c => `r.${c}`).join(', ')}, p.slug as productSlug
        FROM reviews r
        LEFT JOIN products p ON r.productId = p.id
        ${whereSQL}
@@ -161,7 +165,7 @@ router.post('/admin', authenticateToken, requireAdmin, async (req: AuthRequest, 
 
     await recalculateProductReviewSummary(productId);
 
-    const [rows] = await pool.execute('SELECT * FROM reviews WHERE id = ?', [id]);
+    const [rows] = await pool.execute(`SELECT ${REVIEW_COLS_ADMIN} FROM reviews WHERE id = ?`, [id]);
     res.status(201).json((rows as any[])[0]);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -177,7 +181,7 @@ router.put('/:id/approve', authenticateToken, requireAdmin, async (req: AuthRequ
       ['approved', now, req.user?.email || 'admin', now, req.params.id]
     );
 
-    const [rows] = await pool.execute('SELECT * FROM reviews WHERE id = ?', [req.params.id]);
+    const [rows] = await pool.execute(`SELECT ${REVIEW_COLS_ADMIN} FROM reviews WHERE id = ?`, [req.params.id]);
     if ((rows as any[]).length === 0) return res.status(404).json({ error: 'Review not found' });
 
     const review = (rows as any[])[0];
@@ -196,7 +200,7 @@ router.put('/:id/reject', authenticateToken, requireAdmin, async (req: Request, 
       ['rejected', new Date(), req.params.id]
     );
 
-    const [rows] = await pool.execute('SELECT * FROM reviews WHERE id = ?', [req.params.id]);
+    const [rows] = await pool.execute(`SELECT ${REVIEW_COLS_ADMIN} FROM reviews WHERE id = ?`, [req.params.id]);
     if ((rows as any[]).length === 0) return res.status(404).json({ error: 'Review not found' });
 
     const review = (rows as any[])[0];
@@ -225,7 +229,7 @@ router.put('/:id', authenticateToken, requireAdmin, async (req: Request, res: Re
     params.push(req.params.id);
     await pool.execute(`UPDATE reviews SET ${setParts.join(', ')} WHERE id = ?`, params);
 
-    const [rows] = await pool.execute('SELECT * FROM reviews WHERE id = ?', [req.params.id]);
+    const [rows] = await pool.execute(`SELECT ${REVIEW_COLS_ADMIN} FROM reviews WHERE id = ?`, [req.params.id]);
     if ((rows as any[]).length === 0) return res.status(404).json({ error: 'Review not found' });
 
     const review = (rows as any[])[0];

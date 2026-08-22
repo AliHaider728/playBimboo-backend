@@ -3,15 +3,19 @@ import { pool } from '../mysql-lib/db.js';
 import { authenticateToken, requireSuperAdmin } from '../middleware/auth.js';
 import crypto from 'crypto';
 
+// ─── Explicit column lists (no SELECT *) ────────────────────────────────────
+const GLOBAL_ATTR_COLS = 'id, name, slug, displayType, createdAt, updatedAt';
+const GLOBAL_TERM_COLS = 'id, attribute_id, label, slug, value, colorValue, imageUrl, imageAlt, position';
+
 const router = Router();
 
 // Helper to assemble attributes + terms
 async function getAttributeWithTerms(id: string) {
-  const [attrRows] = await pool.execute('SELECT * FROM global_attributes WHERE id = ?', [id]);
+  const [attrRows] = await pool.execute(`SELECT ${GLOBAL_ATTR_COLS} FROM global_attributes WHERE id = ?`, [id]);
   const attrs = attrRows as any[];
   if (attrs.length === 0) return null;
   const attr = attrs[0];
-  const [termRows] = await pool.execute('SELECT * FROM global_attribute_terms WHERE attribute_id = ? ORDER BY position ASC', [id]);
+  const [termRows] = await pool.execute(`SELECT ${GLOBAL_TERM_COLS} FROM global_attribute_terms WHERE attribute_id = ? ORDER BY position ASC`, [id]);
   attr.terms = termRows as any[];
   return attr;
 }
@@ -19,12 +23,12 @@ async function getAttributeWithTerms(id: string) {
 // GET all global attributes
 router.get('/', async (req, res) => {
   try {
-    const [attrRows] = await pool.execute('SELECT * FROM global_attributes ORDER BY createdAt DESC');
+    const [attrRows] = await pool.execute(`SELECT ${GLOBAL_ATTR_COLS} FROM global_attributes ORDER BY createdAt DESC`);
     const attrs = attrRows as any[];
     
     if (attrs.length > 0) {
       const ids = attrs.map(a => `'${a.id}'`).join(',');
-      const [termRows] = await pool.execute(`SELECT * FROM global_attribute_terms WHERE attribute_id IN (${ids}) ORDER BY position ASC`);
+      const [termRows] = await pool.execute(`SELECT ${GLOBAL_TERM_COLS} FROM global_attribute_terms WHERE attribute_id IN (${ids}) ORDER BY position ASC`);
       const terms = termRows as any[];
       
       const termsMap = new Map();
@@ -97,7 +101,7 @@ router.put('/:id', authenticateToken, requireSuperAdmin, async (req, res) => {
   try {
     const { name, slug, displayType } = req.body;
     
-    const [existing] = await pool.execute('SELECT * FROM global_attributes WHERE id = ?', [req.params.id]);
+    const [existing] = await pool.execute(`SELECT ${GLOBAL_ATTR_COLS} FROM global_attributes WHERE id = ?`, [req.params.id]);
     if ((existing as any[]).length === 0) return res.status(404).json({ error: 'Attribute not found' });
 
     if (slug) {

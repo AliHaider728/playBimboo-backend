@@ -27,11 +27,19 @@ const parseJson = (v: any, fallback: any = null) => {
   try { return JSON.parse(v); } catch { return fallback; }
 };
 
+// ─── Explicit column lists (no SELECT *) ────────────────────────────────────
+const PRODUCT_COL_LIST = ['id','name','slug','sku','price','originalPrice','discountPercent','rating','reviewCount','categoryId','brand','inStock','trackInventory','stockQuantity','stockStatus','lowStockThreshold','isVisible','status','displayOrder','isFeatured','isBestseller','isNewArrival','isSpotlight','weight','deliveryType','customDeliveryFee','shortDescription','description','features','safetyInfo','specifications','tags','metaTitle','metaDescription','productDetailBlocks','pricingOffers','defaultAttributes','defaultVariationId','productType','createdAt','updatedAt','variants'];
+const PRODUCT_COLS = PRODUCT_COL_LIST.join(', ');
+const PRODUCT_COLS_P = PRODUCT_COL_LIST.map(c => `p.${c}`).join(', ');
+
+const PRODUCT_IMAGE_COLS = 'product_id, url, publicId, isThumbnail, position';
+const PRODUCT_VARIANT_COLS = 'id, product_id, sku, regularPrice, salePrice, manageStock, stockQuantity, stockStatus, weight, attributes, image, enabled';
+
 // Assemble a full product: main row + images + categories + variants
 async function getFullProduct(conn: any, idOrSlug: string, adminRead = false) {
   const visibilitySQL = adminRead ? '' : 'AND isVisible = 1 AND status != "draft"';
   const [rows] = await conn.execute(
-    `SELECT * FROM products WHERE (id = ? OR slug = ?) ${visibilitySQL} LIMIT 1`,
+    `SELECT ${PRODUCT_COLS} FROM products WHERE (id = ? OR slug = ?) ${visibilitySQL} LIMIT 1`,
     [idOrSlug, idOrSlug]
   );
   if ((rows as any[]).length === 0) return null;
@@ -45,9 +53,9 @@ async function enrichProducts(conn: any, products: any[]) {
   const productIds = products.map(p => p.id);
   const placeholders = productIds.map(() => '?').join(',');
 
-  const [images] = await conn.execute(`SELECT * FROM product_images WHERE product_id IN (${placeholders}) ORDER BY product_id, position ASC`, productIds);
+  const [images] = await conn.execute(`SELECT ${PRODUCT_IMAGE_COLS} FROM product_images WHERE product_id IN (${placeholders}) ORDER BY product_id, position ASC`, productIds);
   const [pcats] = await conn.execute(`SELECT pc.product_id, c.id, c.name, c.slug FROM product_categories pc JOIN categories c ON pc.category_id = c.id WHERE pc.product_id IN (${placeholders})`, productIds);
-  const [variants] = await conn.execute(`SELECT * FROM product_variants WHERE product_id IN (${placeholders})`, productIds);
+  const [variants] = await conn.execute(`SELECT ${PRODUCT_VARIANT_COLS} FROM product_variants WHERE product_id IN (${placeholders})`, productIds);
 
   const imagesByProduct = new Map();
   const categoriesByProduct = new Map();
@@ -132,7 +140,7 @@ router.get('/', authenticateIfPresent, async (req: AuthRequest, res: Response) =
     const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
     const limitSQL = limit ? `LIMIT ${Math.min(Number(limit), 500)}` : '';
 
-    const [rows] = await pool.execute(`SELECT * FROM products ${where} ORDER BY displayOrder ASC, createdAt DESC ${limitSQL}`, params);
+    const [rows] = await pool.execute(`SELECT ${PRODUCT_COLS} FROM products ${where} ORDER BY displayOrder ASC, createdAt DESC ${limitSQL}`, params);
     res.json(await enrichProducts(pool, rows as any[]));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -150,7 +158,7 @@ router.get('/:idOrSlug/related', authenticateIfPresent, async (req: AuthRequest,
     if (product.categoryIds?.length > 0) {
       const placeholders = product.categoryIds.map(() => '?').join(',');
       const [catRelated] = await pool.execute(
-        `SELECT DISTINCT p.* FROM products p
+        `SELECT DISTINCT ${PRODUCT_COLS_P} FROM products p
          JOIN product_categories pc ON p.id = pc.product_id
          WHERE pc.category_id IN (${placeholders}) AND p.id != ? AND p.isVisible = 1 AND p.status != "draft"
          LIMIT 4`,
@@ -163,7 +171,7 @@ router.get('/:idOrSlug/related', authenticateIfPresent, async (req: AuthRequest,
       const excludeIds = [product.id, ...related.map(r => r.id)];
       const excPlaceholders = excludeIds.map(() => '?').join(',');
       const [fallback] = await pool.execute(
-        `SELECT * FROM products WHERE id NOT IN (${excPlaceholders}) AND isVisible = 1 AND status != "draft" LIMIT ?`,
+        `SELECT ${PRODUCT_COLS} FROM products WHERE id NOT IN (${excPlaceholders}) AND isVisible = 1 AND status != "draft" LIMIT ?`,
         [...excludeIds, 4 - related.length]
       );
       related = [...related, ...fallback as any[]];
@@ -357,7 +365,7 @@ router.put('/:id', authenticateToken, requireAdmin, async (req: AuthRequest, res
   await conn.beginTransaction();
 
   try {
-    const [existingRows] = await conn.execute('SELECT * FROM products WHERE id = ?', [req.params.id]);
+    const [existingRows] = await conn.execute(`SELECT ${PRODUCT_COLS} FROM products WHERE id = ?`, [req.params.id]);
     if ((existingRows as any[]).length === 0) {
       await conn.rollback();
       return res.status(404).json({ error: 'Product not found' });

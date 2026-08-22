@@ -19,14 +19,19 @@ const logEmailFailure = (kind: string, orderId: string, error: unknown) => {
   console.error(`${kind} email failed for order ${orderId} (${getEmailFailureCode(error)}).`);
 };
 
+// ─── Explicit column lists (no SELECT *) ────────────────────────────────────
+const ORDER_COLS = 'id, orderId, user_id, guestEmail, guestPhone, total, subtotal, shippingFee, status, paymentMethod, shippingAddress, paymentDetails, createdAt, updatedAt, discountAmount, appliedCoupon, checkoutRequestId, trackingNumber, confirmationEmailSentAt, confirmationEmailAccepted';
+const ORDER_ITEM_COLS = 'id, order_id, productId, productName, quantity, price, image, selectedVariant, variationId';
+const ORDER_HISTORY_COLS = 'id, order_id, status, note, timestamp';
+
 // Helper: Assemble a full order object (order + items + status history)
 async function getFullOrder(conn: any, orderId: string) {
-  const [orderRows] = await conn.execute('SELECT * FROM orders WHERE orderId = ?', [orderId]);
+  const [orderRows] = await conn.execute(`SELECT ${ORDER_COLS} FROM orders WHERE orderId = ?`, [orderId]);
   if ((orderRows as any[]).length === 0) return null;
 
   const order = (orderRows as any[])[0];
-  const [items] = await conn.execute('SELECT * FROM order_items WHERE order_id = ?', [order.id]);
-  const [history] = await conn.execute('SELECT * FROM order_status_history WHERE order_id = ? ORDER BY timestamp ASC', [order.id]);
+  const [items] = await conn.execute(`SELECT ${ORDER_ITEM_COLS} FROM order_items WHERE order_id = ?`, [order.id]);
+  const [history] = await conn.execute(`SELECT ${ORDER_HISTORY_COLS} FROM order_status_history WHERE order_id = ? ORDER BY timestamp ASC`, [order.id]);
 
   order.items = items;
   order.statusHistory = history;
@@ -81,7 +86,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
     const { email, page, limit, search, status } = req.query;
     const isAdmin = ['admin', 'super_admin'].includes(req.user?.role || '');
     
-    let sql = 'SELECT * FROM orders';
+    let sql = `SELECT ${ORDER_COLS} FROM orders`;
     let countSql = 'SELECT COUNT(*) as count FROM orders';
     const params: any[] = [];
     const conditions: string[] = [];
@@ -137,7 +142,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
     if (ordersArr.length > 0) {
       const orderIds = ordersArr.map(o => o.id);
       const placeholders = orderIds.map(() => '?').join(',');
-      const [allItems] = await pool.execute(`SELECT * FROM order_items WHERE order_id IN (${placeholders})`, orderIds);
+      const [allItems] = await pool.execute(`SELECT ${ORDER_ITEM_COLS} FROM order_items WHERE order_id IN (${placeholders})`, orderIds);
       const itemsMap = new Map<string, any[]>();
       (allItems as any[]).forEach(item => {
         if (!itemsMap.has(item.order_id)) itemsMap.set(item.order_id, []);
@@ -381,7 +386,7 @@ router.put('/:orderId/status', authenticateToken, requireAdmin, async (req: Requ
       return res.status(400).json({ error: 'Invalid order status' });
     }
 
-    const [orderRows] = await conn.execute('SELECT * FROM orders WHERE orderId = ? FOR UPDATE', [req.params.orderId]);
+    const [orderRows] = await conn.execute('SELECT id, status, orderId FROM orders WHERE orderId = ? FOR UPDATE', [req.params.orderId]);
     if ((orderRows as any[]).length === 0) {
       await conn.rollback();
       return res.status(404).json({ error: 'Order not found' });
@@ -393,7 +398,7 @@ router.put('/:orderId/status', authenticateToken, requireAdmin, async (req: Requ
 
     // If cancelling — restore stock
     if (status === 'Cancelled' && previousStatus !== 'Cancelled') {
-      const [items] = await conn.execute('SELECT * FROM order_items WHERE order_id = ?', [order.id]);
+      const [items] = await conn.execute('SELECT productId, quantity FROM order_items WHERE order_id = ?', [order.id]);
       for (const item of items as any[]) {
         await conn.execute(
           `UPDATE products SET stockQuantity = stockQuantity + ?, updatedAt = ? WHERE id = ? AND trackInventory = 1`,

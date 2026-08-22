@@ -10,6 +10,8 @@ import {
 } from '../config/storeAppearance.js';
 import crypto from 'crypto';
 
+const SETTINGS_COLS = 'id, storeName, email, phone, address, currency, freeShippingThreshold, standardShippingFee, taxRate, defaultMetaTitle, defaultMetaDescription, storefrontNavigation, homepageSections, socialLinks, createdAt, updatedAt';
+
 const router = Router();
 
 const cleanText = (value: unknown, maxLength: number) =>
@@ -29,7 +31,7 @@ const finiteNumber = (value: unknown, field: string, maximum: number) => {
 };
 
 const getSettings = async () => {
-  const [rows] = await pool.execute('SELECT * FROM settings LIMIT 1');
+  const [rows] = await pool.execute(`SELECT ${SETTINGS_COLS} FROM settings LIMIT 1`);
   let settings = (rows as any[])[0];
   
   if (!settings) {
@@ -47,7 +49,7 @@ const getSettings = async () => {
         now, now
       ]
     );
-    const [newRows] = await pool.execute('SELECT * FROM settings LIMIT 1');
+    const [newRows] = await pool.execute(`SELECT ${SETTINGS_COLS} FROM settings LIMIT 1`);
     settings = (newRows as any[])[0];
   }
   return settings;
@@ -61,7 +63,7 @@ const resolvePublicNavigation = async (settings: any) => {
   );
   
   // Note: 'status' in MySQL replaces isActive boolean, usually 'Active'/'Inactive'
-  const [catRows] = await pool.execute('SELECT * FROM categories WHERE status != "inactive" AND status != "Inactive" ORDER BY displayOrder ASC, name ASC');
+  const [catRows] = await pool.execute('SELECT id, name, slug FROM categories WHERE status != "inactive" AND status != "Inactive" ORDER BY displayOrder ASC, name ASC');
   const categories = catRows as any[];
   
   const byId = new Map(categories.map(category => [category.id, category]));
