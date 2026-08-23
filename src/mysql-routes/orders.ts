@@ -150,8 +150,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
       });
       ordersArr = ordersArr.map(o => {
         o.items = itemsMap.get(o.id) || [];
-        o.shippingAddress = typeof o.shippingAddress === 'string' ? JSON.parse(o.shippingAddress) : o.shippingAddress;
-        return o;
+        return mapOrderForFrontend(o);
       });
     }
 
