@@ -46,7 +46,7 @@ function generateOrderId() {
 
 
 // Map MySQL order structure to match the old MongoDB schema expected by the frontend
-function mapOrderForFrontend(o: any) {
+export function mapOrderForFrontend(o: any) {
   const shipAddr = typeof o.shippingAddress === 'string' ? JSON.parse(o.shippingAddress) : (o.shippingAddress || {});
   
   let dateStr = o.date;
