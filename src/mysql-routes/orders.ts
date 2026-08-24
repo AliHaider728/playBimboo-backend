@@ -26,7 +26,7 @@ const ORDER_HISTORY_COLS = 'id, order_id, status, note, timestamp';
 
 // Helper: Assemble a full order object (order + items + status history)
 async function getFullOrder(conn: any, orderId: string) {
-  const [orderRows] = await conn.execute(`SELECT ${ORDER_COLS} FROM orders WHERE orderId = ?`, [orderId]);
+  const [orderRows] = await conn.execute(`SELECT ${ORDER_COLS} FROM orders WHERE id = ? OR orderId = ?`, [orderId, orderId]);
   if ((orderRows as any[]).length === 0) return null;
 
   const order = (orderRows as any[])[0];
@@ -385,7 +385,7 @@ router.put('/:orderId/status', authenticateToken, requireAdmin, async (req: Requ
       return res.status(400).json({ error: 'Invalid order status' });
     }
 
-    const [orderRows] = await conn.execute('SELECT id, status, orderId FROM orders WHERE orderId = ? FOR UPDATE', [req.params.orderId]);
+    const [orderRows] = await conn.execute('SELECT id, status, orderId FROM orders WHERE id = ? OR orderId = ? FOR UPDATE', [req.params.orderId, req.params.orderId]);
     if ((orderRows as any[]).length === 0) {
       await conn.rollback();
       return res.status(404).json({ error: 'Order not found' });
@@ -455,7 +455,7 @@ router.put('/:orderId/tracking', authenticateToken, requireAdmin, async (req: Re
 // DELETE Order (Admin)
 router.delete('/:orderId', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
-    const [orderRows] = await pool.execute('SELECT id FROM orders WHERE orderId = ?', [req.params.orderId]);
+    const [orderRows] = await pool.execute('SELECT id FROM orders WHERE id = ? OR orderId = ?', [req.params.orderId, req.params.orderId]);
     if ((orderRows as any[]).length === 0) return res.status(404).json({ error: 'Order not found' });
     const orderIdInternal = (orderRows as any[])[0].id;
 
