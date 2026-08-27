@@ -42,7 +42,7 @@ const getSettings = async () => {
       `INSERT INTO settings (id, storeName, email, phone, address, currency, freeShippingThreshold, standardShippingFee, taxRate, defaultMetaTitle, defaultMetaDescription, storefrontNavigation, homepageSections, socialLinks, createdAt, updatedAt)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        id, 'PlayBimboo', 'support@playbimboo.com', '', '', 'Rs.', 0, 0, 0, '', '',
+        id, 'Alvora', 'support@alvora.com', '', '', 'Rs.', 0, 0, 0, '', '',
         JSON.stringify(DEFAULT_STOREFRONT_NAVIGATION),
         JSON.stringify(DEFAULT_HOMEPAGE_SECTIONS),
         JSON.stringify({}),
@@ -111,10 +111,10 @@ const toPublicSettings = async (settings: any) => {
     storefrontNavigation: await resolvePublicNavigation(settings),
     homepageSections: normalizeStoredHomepageSections(homepageSections || []),
     socialLinks: {
-      instagram: socialLinks.instagram || 'https://www.instagram.com/playbimbootoys',
-      facebook: socialLinks.facebook || 'https://facebook.com/playbimbootoys',
-      youtube: socialLinks.youtube || 'https://youtube.com/@playbimboo',
-      tiktok: socialLinks.tiktok || 'https://tiktok.com/@playbimbootoys'
+      instagram: socialLinks.instagram || 'https://www.instagram.com/alvoratoys',
+      facebook: socialLinks.facebook || 'https://facebook.com/alvoratoys',
+      youtube: socialLinks.youtube || 'https://youtube.com/@alvora',
+      tiktok: socialLinks.tiktok || 'https://tiktok.com/@alvoratoys'
     }
   };
 };

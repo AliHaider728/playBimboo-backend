@@ -19,7 +19,7 @@ const buildTree = (categories: any[], parentId: string | null = null): any[] => 
 
 router.get('/', async (_req: Request, res: Response) => {
   try {
-    const [rows] = await pool.execute('SELECT ${CATEGORY_COLS} FROM categories WHERE status != "inactive" ORDER BY displayOrder ASC, name ASC');
+    const [rows] = await pool.execute(`SELECT ${CATEGORY_COLS} FROM categories WHERE status != "inactive" ORDER BY displayOrder ASC, name ASC`);
     res.json(buildTree(rows as any[]));
   } catch (error) {
     res.status(500).json({ error: 'Could not load categories' });
@@ -28,7 +28,7 @@ router.get('/', async (_req: Request, res: Response) => {
 
 router.get('/admin/all', authenticateToken, requireSuperAdmin, async (_req: Request, res: Response) => {
   try {
-    const [rows] = await pool.execute('SELECT ${CATEGORY_COLS} FROM categories ORDER BY displayOrder ASC, name ASC');
+    const [rows] = await pool.execute(`SELECT ${CATEGORY_COLS} FROM categories ORDER BY displayOrder ASC, name ASC`);
     res.json(buildTree(rows as any[]));
   } catch (error) {
     res.status(500).json({ error: 'Could not load categories' });
@@ -62,7 +62,7 @@ router.post('/', authenticateToken, requireSuperAdmin, async (req: Request, res:
       ]
     );
 
-    const [newCat] = await pool.execute('SELECT ${CATEGORY_COLS} FROM categories WHERE id = ?', [id]);
+    const [newCat] = await pool.execute(`SELECT ${CATEGORY_COLS} FROM categories WHERE id = ?`, [id]);
     res.status(201).json((newCat as any[])[0]);
   } catch (error: any) {
     res.status(400).json({ error: 'Could not create category' });
@@ -73,7 +73,7 @@ router.put('/:id', authenticateToken, requireSuperAdmin, async (req: Request, re
   try {
     const { name, slug, description, parentId, status, displayOrder, isFeatured } = req.body;
     
-    const [existing] = await pool.execute('SELECT ${CATEGORY_COLS} FROM categories WHERE id = ?', [req.params.id]);
+    const [existing] = await pool.execute(`SELECT ${CATEGORY_COLS} FROM categories WHERE id = ?`, [req.params.id]);
     if ((existing as any[]).length === 0) return res.status(404).json({ error: 'Category not found' });
 
     if (slug) {
@@ -94,7 +94,7 @@ router.put('/:id', authenticateToken, requireSuperAdmin, async (req: Request, re
       [name || null, slug ? slug.toLowerCase() : null, description || null, parentId || null, status || null, displayOrder ?? null, isFeatured !== undefined ? (isFeatured ? 1 : 0) : null, new Date(), req.params.id]
     );
 
-    const [updated] = await pool.execute('SELECT ${CATEGORY_COLS} FROM categories WHERE id = ?', [req.params.id]);
+    const [updated] = await pool.execute(`SELECT ${CATEGORY_COLS} FROM categories WHERE id = ?`, [req.params.id]);
     res.json((updated as any[])[0]);
   } catch (error: any) {
     res.status(400).json({ error: 'Could not update category' });

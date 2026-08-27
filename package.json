@@ -1,7 +1,7 @@
 {
-  "name": "playbimboo-backend",
+  "name": "alvora-backend",
   "version": "1.0.0",
-  "description": "Express + MongoDB API Backend for PlayBimboo Toy Store E-Commerce",
+  "description": "Express + MySQL API Backend for Alvora Skincare",
   "main": "dist/server.js",
   "engines": {
     "node": ">=18"

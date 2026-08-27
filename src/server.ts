@@ -14,6 +14,7 @@ import mysqlAuthRoutes from './mysql-routes/auth.js';
 import mysqlReviewRoutes from './mysql-routes/reviews.js';
 import mysqlOrderRoutes from './mysql-routes/orders.js';
 import mysqlProductRoutes from './mysql-routes/products.js';
+import bundlesRouter from './mysql-routes/bundles.js';
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -24,8 +25,8 @@ const app = express();
 
 const configuredFrontendUrl = process.env.FRONTEND_URL?.trim();
 const allowedOrigins = [
-  'https://playbimboo.com',
-  'https://www.playbimboo.com',
+  'https://alvora.com',
+  'https://www.alvora.com',
   'https://play-bimboo.vercel.app',
   'http://localhost:3000',
   'http://localhost:3001',
@@ -57,7 +58,7 @@ app.get('/', async (_req: Request, res: Response) => {
 
   res.json({
     status: 'online',
-    message: 'PlayBimboo API Backend is running (MySQL)',
+    message: 'Alvora API Backend is running (MySQL)',
     database: dbStatus,
     endpoints: [
       '/api/products',
@@ -100,6 +101,7 @@ app.use('/api/auth', mysqlAuthRoutes);
 app.use('/api/reviews', mysqlReviewRoutes);
 app.use('/api/orders', mysqlOrderRoutes);
 app.use('/api/products', mysqlProductRoutes);
+app.use('/api/bundles', bundlesRouter);
 app.use('/api/upload', uploadRoutes);
 
 export default app;
@@ -161,7 +163,7 @@ if (
         const [[{ count: users }]] = await pool.execute<any>('SELECT COUNT(*) as count FROM users');
 
         console.log('\n=========================================');
-        console.log('  PlayBimboo Backend API (MySQL)');
+        console.log('  Alvora Backend API (MySQL)');
         console.log(`  Status: RUNNING on http://localhost:${port}`);
         console.log('  Database: CONNECTED (MySQL)');
         console.log(`  Products: ${products} | Reviews: ${reviews} | Orders: ${orders}`);
@@ -169,7 +171,7 @@ if (
         console.log('=========================================\n');
       } catch (err) {
         console.log('\n=========================================');
-        console.log('  PlayBimboo Backend API (MySQL)');
+        console.log('  Alvora Backend API (MySQL)');
         console.log(`  Status: RUNNING on http://localhost:${port}`);
         console.log('  Database: DISCONNECTED (MySQL Error)');
         console.log('=========================================\n');
