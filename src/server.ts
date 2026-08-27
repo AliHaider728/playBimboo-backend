@@ -15,6 +15,7 @@ import mysqlReviewRoutes from './mysql-routes/reviews.js';
 import mysqlOrderRoutes from './mysql-routes/orders.js';
 import mysqlProductRoutes from './mysql-routes/products.js';
 import bundlesRouter from './mysql-routes/bundles.js';
+import audioReviewsRouter from './mysql-routes/audioReviews.js';
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -102,6 +103,7 @@ app.use('/api/reviews', mysqlReviewRoutes);
 app.use('/api/orders', mysqlOrderRoutes);
 app.use('/api/products', mysqlProductRoutes);
 app.use('/api/bundles', bundlesRouter);
+app.use('/api/audio-reviews', audioReviewsRouter);
 app.use('/api/upload', uploadRoutes);
 
 export default app;
