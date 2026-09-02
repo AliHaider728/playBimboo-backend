@@ -11,6 +11,7 @@ import {
   uploadCategoryImage,
   uploadReviewImage
 } from '../lib/cloudinary.js';
+import { uploadToR2, deleteFromR2 } from '../lib/r2.js';
 import { createProductThumbnail } from '../lib/productImages.js';
 import { pool } from '../mysql-lib/db.js';
 const router = Router();
@@ -48,7 +49,6 @@ router.post(
   '/image',
   authenticateToken,
   requireAdmin,
-  requireCloudinaryConfiguration,
   upload.single('image'),
   async (req: Request, res: Response) => {
     if (!req.file) {
@@ -56,29 +56,32 @@ router.post(
     }
 
     try {
+      const timestamp = Date.now();
+      const filenameBase = req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const originalFilename = `products/${timestamp}-${filenameBase}`;
+      const thumbnailFilename = `products/thumb-${timestamp}-${filenameBase}`;
+
+      // Create thumbnail
       const thumbnailBuffer = await createProductThumbnail(req.file.buffer);
-      const result = await uploadProductImage(req.file);
-      let thumbnail: Awaited<ReturnType<typeof uploadProductThumbnail>>;
-      try {
-        thumbnail = await uploadProductThumbnail(thumbnailBuffer);
-      } catch {
-        await deleteProductImage(result.publicId).catch(() => undefined);
-        throw new Error('Product thumbnail upload failed');
-      }
+
+      // Upload both to R2
+      const url = await uploadToR2(req.file.buffer, originalFilename, req.file.mimetype);
+      const thumbnailUrl = await uploadToR2(thumbnailBuffer, thumbnailFilename, 'image/webp');
+
       res.json({
-        url: result.url,
-        secureUrl: result.url,
-        publicId: result.publicId,
-        thumbnailUrl: thumbnail.url,
-        thumbnailSecureUrl: thumbnail.url,
-        thumbnailPublicId: thumbnail.publicId,
-        filename: result.publicId,
+        url: url,
+        secureUrl: url,
+        publicId: originalFilename,
+        thumbnailUrl: thumbnailUrl,
+        thumbnailSecureUrl: thumbnailUrl,
+        thumbnailPublicId: thumbnailFilename,
+        filename: originalFilename,
         mimetype: req.file.mimetype,
         size: req.file.size
       });
-    } catch {
-      console.error('Cloudinary image upload failed.');
-      res.status(502).json({ error: 'Cloudinary image upload failed' });
+    } catch (err) {
+      console.error('R2 image upload failed:', err);
+      res.status(502).json({ error: 'R2 image upload failed' });
     }
   }
 );
@@ -180,10 +183,9 @@ router.delete(
   '/image',
   authenticateToken,
   requireAdmin,
-  requireCloudinaryConfiguration,
   async (req: Request, res: Response) => {
     const publicId = typeof req.body?.publicId === 'string' ? req.body.publicId.trim() : '';
-    if (!publicId) return res.status(400).json({ error: 'Cloudinary public ID is required' });
+    if (!publicId) return res.status(400).json({ error: 'Image public ID is required' });
 
     try {
       const [pRows] = await pool.execute('SELECT product_id FROM product_images WHERE public_id = ? OR thumbnail_public_id = ?', [publicId, publicId]);
@@ -193,17 +195,23 @@ router.delete(
           error: 'This image is attached to a saved product and must be removed through the product editor.'
         });
       }
-      const result = await deleteProductImage(publicId);
-      if (!['ok', 'not found'].includes(result.result)) {
-        return res.status(502).json({ error: 'Cloudinary did not confirm image deletion' });
+      
+      await deleteFromR2(publicId);
+      
+      // Also attempt to delete the thumbnail if it exists
+      const thumbId = publicId.replace('products/', 'products/thumb-');
+      if (thumbId !== publicId) {
+        try {
+          await deleteFromR2(thumbId);
+        } catch (e) {
+          console.error('Thumbnail deletion failed (might not exist):', e);
+        }
       }
+
       res.json({ deleted: true });
     } catch (error) {
-      console.error('Cloudinary image deletion failed.');
-      const message = error instanceof Error && error.message.startsWith('Invalid Alvora')
-        ? error.message
-        : 'Cloudinary image deletion failed';
-      res.status(message.startsWith('Invalid') ? 400 : 502).json({ error: message });
+      console.error('R2 image deletion failed:', error);
+      res.status(502).json({ error: 'R2 image deletion failed' });
     }
   }
 );

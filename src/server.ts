@@ -145,8 +145,13 @@ if (
             : stdout.trim().match(/\s+(\d+)\s+/);
 
           const pid = match ? match[1] : 'Unknown';
-          console.error(`\n🚨 ERROR: Port ${port} is already in use.`);
-          console.error(`The backend may already be running. Check PID ${pid} before starting another instance.\n`);
+          console.error(`\n[ERROR] Port ${port} is already in use.`);
+          console.error(`The backend may already be running on PID ${pid}.`);
+          if (process.platform === 'win32') {
+            console.error(`Run this command to kill it: taskkill /PID ${pid} /F\n`);
+          } else {
+            console.error(`Run this command to kill it: kill -9 ${pid}\n`);
+          }
           process.exit(1);
         }
       } catch (err) {
@@ -182,8 +187,15 @@ if (
 
     server.on('error', (error: any) => {
       if (error.code === 'EADDRINUSE') {
-        console.error(`\n🚨 ERROR: Port ${port} is already in use by another process.`);
-        console.error(`Please stop the process running on port ${port} or specify a different port.\n`);
+        console.error(`\n[ERROR] Port ${port} is already in use by another process.`);
+        console.error(`Please kill the process to restart the backend.`);
+        if (process.platform === 'win32') {
+          console.error(`Run this command to find the PID:  netstat -ano | findstr :${port}`);
+          console.error(`Then kill it:                      taskkill /PID <pid> /F\n`);
+        } else {
+          console.error(`Run this command to find the PID:  lsof -i :${port}`);
+          console.error(`Then kill it:                      kill -9 <pid>\n`);
+        }
         process.exit(1);
       } else {
         console.error('Server error:', error);

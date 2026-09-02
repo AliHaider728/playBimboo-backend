@@ -3,7 +3,7 @@ import multer from 'multer';
 import { randomUUID } from 'crypto';
 import { pool } from '../mysql-lib/db.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
-import { r2Upload, r2Delete } from '../utils/r2Upload.js';
+import { uploadToR2, deleteFromR2 } from '../lib/r2.js';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -49,12 +49,12 @@ router.post('/', authenticateToken, requireAdmin, upload.single('audio'), async 
 
     let audioUrl = '';
     try {
-      audioUrl = await r2Upload(req.file.buffer, req.file.originalname, req.file.mimetype);
+      const ext = req.file.originalname.split('.').pop();
+      const filename = `reviews/audio/audio_${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${ext}`;
+      audioUrl = await uploadToR2(req.file.buffer, filename, req.file.mimetype);
     } catch (error: any) {
-      if (error.message === 'R2_CREDENTIALS_MISSING') {
-        return res.status(400).json({ error: 'R2 credentials missing. Please configure them in .env' });
-      }
-      throw error;
+      console.error('Error uploading to R2:', error);
+      return res.status(500).json({ error: 'Failed to upload audio to R2' });
     }
 
     const id = randomUUID();
@@ -116,8 +116,14 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
 
     await pool.execute('DELETE FROM audio_reviews WHERE id = ?', [id]);
     
-    // Attempt R2 cleanup (silent fail if no config)
-    await r2Delete(existing[0].audioUrl);
+    // Attempt R2 cleanup
+    try {
+      const url = new URL(existing[0].audioUrl);
+      const key = url.pathname.replace(/^\//, ''); // Remove leading slash
+      await deleteFromR2(key);
+    } catch (err) {
+      console.error('Failed to delete from R2:', err);
+    }
 
     res.json({ success: true });
   } catch (error) {
