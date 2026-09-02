@@ -135,7 +135,7 @@ if (
       try {
         const { stdout } = await execAsync(
           process.platform === 'win32'
-            ? `netstat -ano | findstr :${port}`
+            ? `netstat -ano | findstr :${port} | findstr LISTENING`
             : `lsof -i :${port} | grep LISTEN`
         );
 
