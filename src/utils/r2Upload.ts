@@ -20,7 +20,8 @@ export const r2Upload = async (buffer: Buffer, originalName: string, mimeType: s
     throw new Error('R2_CREDENTIALS_MISSING');
   }
 
-  const bucketName = process.env.R2_BUCKET_NAME || 'alvora-audio';
+  const bucketName = process.env.R2_BUCKET_NAME;
+  if (!bucketName) throw new Error('R2_BUCKET_NAME_MISSING');
   const publicUrlBase = process.env.R2_PUBLIC_URL || '';
 
   // Generate unique filename
@@ -43,7 +44,8 @@ export const r2Upload = async (buffer: Buffer, originalName: string, mimeType: s
 export const r2Delete = async (fileUrl: string): Promise<void> => {
   if (!s3Client) return; // Silent skip if no config
 
-  const bucketName = process.env.R2_BUCKET_NAME || 'alvora-audio';
+  const bucketName = process.env.R2_BUCKET_NAME;
+  if (!bucketName) throw new Error('R2_BUCKET_NAME_MISSING');
   try {
     const url = new URL(fileUrl);
     const key = url.pathname.replace(/^\//, ''); // Remove leading slash

@@ -213,6 +213,11 @@ router.post('/', async (req: Request, res: Response) => {
         let existingOrder = await getFullOrder(conn, (existing as any[])[0].orderId);
         if (existingOrder) existingOrder = mapOrderForFrontend(existingOrder);
         await conn.commit();
+        // Retry with the original stable ID; TikTok deduplicates previous successes.
+        if (existingOrder) {
+          try { await sendTikTokPurchase({ order: existingOrder, req, eventId: `purchase_${existingOrder.orderId}` }); }
+          catch (error) { console.error('[TikTok Events API] Existing order delivery failed', existingOrder.orderId, error); }
+        }
         return res.status(200).json(existingOrder);
       }
     }
@@ -335,6 +340,13 @@ router.post('/', async (req: Request, res: Response) => {
     // Fire-and-forget CAPI events + emails (same pattern as MongoDB version)
     const metaEventId = `purchase_${orderId}`;
 
+    // Await independently of emails/Meta. Failure never rolls back a committed order.
+    try {
+      await sendTikTokPurchase({ order: newOrder || { ...mapOrderForFrontend({ id: internalId, orderId, guestEmail: email, guestPhone: phone, total, createdAt: now, items: canonicalItems }) }, req, eventId: metaEventId });
+    } catch (error) {
+      console.error('[TikTok Events API] Saved order purchase delivery failed', orderId, error);
+    }
+
     void (async () => {
       try { 
         await sendOrderConfirmationEmail(newOrder, {}); 
@@ -356,11 +368,6 @@ router.post('/', async (req: Request, res: Response) => {
         await sendMetaPurchase({ order: capiOrder, req, eventId: metaEventId });
         console.log(`[Meta CAPI] Tracked order ${orderId}`);
       } catch (e) { console.error(`[Meta CAPI] Could not track order ${orderId}:`, e); }
-      try {
-        const capiOrder = { ...newOrder, email: newOrder.guestEmail, phone: newOrder.guestPhone, customerName: newOrder.shippingAddress?.name };
-        await sendTikTokPurchase({ order: capiOrder, req, eventId: metaEventId });
-        console.log(`[TikTok Events API] Tracked order ${orderId}`);
-      } catch (e) { console.error(`[TikTok Events API] Could not track order ${orderId}:`, e); }
     })();
 
     res.status(201).json(newOrder);

@@ -2,16 +2,21 @@
 
 require('dotenv/config');
 
+process.on('uncaughtException', (err) => {
+  console.error('[UNCAUGHT EXCEPTION]', err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[UNHANDLED REJECTION]', reason);
+});
+
 const app = require('./dist/server.js');
 
-const port = Number.parseInt(process.env.PORT || '5000', 10);
-
-if (!Number.isInteger(port) || port < 1 || port > 65535) {
-  throw new Error('PORT must be an integer between 1 and 65535');
-}
+const rawPort = process.env.PORT || '5000';
+const parsedPort = Number.parseInt(rawPort, 10);
+const port = (!Number.isNaN(parsedPort) && parsedPort >= 1 && parsedPort <= 65535) ? parsedPort : rawPort;
 
 app.listen(port, () => {
-  console.log(`PlayBimboo API listening on port ${port}`);
+  console.log(`PlayBimboo API listening on ${port}`);
 });
 
 module.exports = app;

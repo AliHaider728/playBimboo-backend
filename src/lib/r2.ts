@@ -24,7 +24,8 @@ export const uploadToR2 = async (
   fileName: string,
   contentType: string
 ): Promise<string> => {
-  const bucketName = process.env.R2_BUCKET_NAME || 'alvora-assets';
+  const bucketName = process.env.R2_BUCKET_NAME;
+  if (!bucketName) throw new Error('R2_BUCKET_NAME_MISSING');
   const publicUrlBase = process.env.R2_PUBLIC_URL || '';
 
   const command = new PutObjectCommand({
@@ -44,7 +45,8 @@ export const uploadToR2 = async (
  * Delete a file from the configured R2 bucket.
  */
 export const deleteFromR2 = async (fileName: string): Promise<void> => {
-  const bucketName = process.env.R2_BUCKET_NAME || 'alvora-assets';
+  const bucketName = process.env.R2_BUCKET_NAME;
+  if (!bucketName) throw new Error('R2_BUCKET_NAME_MISSING');
 
   const command = new DeleteObjectCommand({
     Bucket: bucketName,

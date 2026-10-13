@@ -142,7 +142,7 @@ router.delete(
       res.json({ deleted: true });
     } catch (error) {
       console.error('Cloudinary category image deletion failed.');
-      const message = error instanceof Error && error.message.startsWith('Invalid Alvora')
+      const message = error instanceof Error && error.message.startsWith('Invalid PlayBimboo')
         ? error.message
         : 'Cloudinary category image deletion failed';
       res.status(message.startsWith('Invalid') ? 400 : 502).json({ error: message });

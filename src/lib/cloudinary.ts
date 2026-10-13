@@ -79,7 +79,7 @@ export const uploadReviewImage = (file: Express.Multer.File) =>
 
 export const deleteProductImage = async (publicId: string) => {
   if (!isProductImagePublicId(publicId)) {
-    throw new Error('Invalid Alvora product image public ID');
+    throw new Error('Invalid PlayBimboo product image public ID');
   }
 
   return cloudinary.uploader.destroy(publicId, {
@@ -103,6 +103,6 @@ export const deleteProductImages = async (publicIds: string[]) => {
 };
 
 export const deleteCategoryImage = async (publicId: string) => {
-  if (!isCategoryImagePublicId(publicId)) throw new Error('Invalid Alvora category image public ID');
+  if (!isCategoryImagePublicId(publicId)) throw new Error('Invalid PlayBimboo category image public ID');
   return cloudinary.uploader.destroy(publicId, { resource_type: 'image', invalidate: true });
 };

@@ -88,11 +88,11 @@ export const DEFAULT_STOREFRONT_NAVIGATION: StorefrontNavigationItem[] = [
 ];
 
 export const DEFAULT_HOMEPAGE_SECTIONS: HomepageSectionSetting[] = [
-  { key: 'hero', name: 'Hero', enabled: true, order: 0, heading: 'Skincare, Made Simple.', subheading: 'Discover clean, effective formulas that nourish your skin and reveal your natural radiance every day.', ctaLabel: 'Explore All Skincare', ctaLink: '/category/all' },
-  { key: 'categories', name: 'Shop by Category', enabled: true, order: 1, heading: 'Shop by Category', subheading: 'Browse Collections', ctaLabel: 'View All Categories', ctaLink: '/category/all' },
-  { key: 'ageGroups', name: 'Shop by Skin Concern', enabled: true, order: 2, heading: 'Shop by Skin Concern', subheading: 'Find the perfect, targeted treatments designed for your specific skin needs.' },
+  { key: 'hero', name: 'Hero', enabled: true, order: 0, heading: 'Play, Learn, Grow.', subheading: 'Discover toys that inspire imagination, learning and happy playtime.', ctaLabel: 'Explore All Toys', ctaLink: '/category/all' },
+  { key: 'categories', name: 'Shop by Category', enabled: false, order: 1, heading: 'Shop by Category', subheading: 'Browse Collections', ctaLabel: 'View All Categories', ctaLink: '/category/all' },
+  { key: 'ageGroups', name: 'Shop by Age', enabled: false, order: 2, heading: 'Shop by Age', subheading: 'Find toys for every stage of childhood.' },
   { key: 'featuredProducts', name: 'Featured Products', enabled: true, order: 3, heading: 'Featured Products & Bestsellers', subheading: 'Hot Picks', ctaLabel: 'Shop All Bestsellers', ctaLink: '/category/all' },
-  { key: 'brandCampaign', name: 'Play, Learn, Grow', enabled: true, order: 4, heading: 'Discover Formulas That Make Skincare Simple', subheading: 'From hydrating serums and gentle cleansers to targeted barrier repair, Alvora brings clean, scientifically-backed formulas that reveal your best skin at every age.', ctaLabel: 'Explore Skincare Favorites', ctaLink: '/category/all' },
+  { key: 'brandCampaign', name: 'Play, Learn, Grow', enabled: true, order: 4, heading: 'Discover Toys That Make Playtime Special', subheading: 'PlayBimboo brings fun, educational toys that spark curiosity and creativity at every age.', ctaLabel: 'Explore Toy Favorites', ctaLink: '/category/all' },
   { key: 'newArrivals', name: 'New Arrivals', enabled: true, order: 5, heading: 'New Arrivals & Restocks', subheading: 'Fresh In Store', ctaLabel: 'Browse New Additions', ctaLink: '/category/all' }
 ];
 

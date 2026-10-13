@@ -1,6 +1,6 @@
-# Alvora Skincare – Backend Technical Documentation
+# PlayBimboo Skincare – Backend Technical Documentation
 
-This document serves as a comprehensive guide to the Alvora backend (Node.js/Express + MySQL). It is designed to act as a complete handoff document for building or integrating a new frontend.
+This document serves as a comprehensive guide to the PlayBimboo backend (Node.js/Express + MySQL). It is designed to act as a complete handoff document for building or integrating a new frontend.
 
 ---
 
@@ -19,7 +19,7 @@ This document serves as a comprehensive guide to the Alvora backend (Node.js/Exp
 
 ## 2. DATABASE SCHEMA
 
-The MySQL database (`tecnosphere_alvora`) contains the following tables:
+The MySQL database (`tecnosphere_playbimboo`) contains the following tables:
 
 ### Core Tables
 

@@ -24,22 +24,58 @@ const execAsync = promisify(exec);
 
 const app = express();
 
-const configuredFrontendUrl = process.env.FRONTEND_URL?.trim();
 const allowedOrigins = [
-  'https://alvora.com',
-  'https://www.alvora.com',
-  'https://play-bimboo.vercel.app',
+  'https://playbimboo.com',
+  'https://www.playbimboo.com',
   'http://localhost:3000',
-  'http://localhost:3001',
   'http://localhost:5173',
-  ...(configuredFrontendUrl ? [configuredFrontendUrl] : [])
+  'https://play-bimboo.vercel.app'
 ];
 
+const isAllowedOrigin = (origin: string | undefined): boolean => {
+  if (!origin) return true;
+  if (allowedOrigins.includes(origin)) return true;
+  try {
+    const url = new URL(origin);
+    const originLower = url.origin.toLowerCase();
+    if (allowedOrigins.includes(originLower)) return true;
+    const hostname = url.hostname.toLowerCase();
+    if (hostname === 'playbimboo.com' || hostname.endsWith('.playbimboo.com')) return true;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
+    if (hostname === 'play-bimboo.vercel.app') return true;
+  } catch {
+    // ignore
+  }
+  return false;
+};
+
+// Explicit CORS headers and preflight handler
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && isAllowedOrigin(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+    res.setHeader('Access-Control-Max-Age', '86400');
+  }
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
+
 const corsOptions: CorsOptions = {
-  origin: allowedOrigins,
+  origin: (origin, callback) => {
+    if (!origin || isAllowedOrigin(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, false);
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
   optionsSuccessStatus: 204
 };
 
@@ -59,7 +95,7 @@ app.get('/', async (_req: Request, res: Response) => {
 
   res.json({
     status: 'online',
-    message: 'Alvora API Backend is running (MySQL)',
+    message: 'PlayBimboo API Backend is running (MySQL)',
     database: dbStatus,
     endpoints: [
       '/api/products',
@@ -112,20 +148,10 @@ if (typeof module !== 'undefined') {
   module.exports = app;
 }
 
-const isPassengerRuntime = Boolean(
-  process.env.PASSENGER_APP_ENV || process.env.PASSENGER_BASE_URI
-);
-
-if (
-  typeof require !== 'undefined' &&
-  require.main === module &&
-  !isPassengerRuntime
-) {
-  const port = Number.parseInt(process.env.PORT ?? '5000', 10);
-
-  if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    throw new Error('PORT must be an integer between 1 and 65535');
-  }
+if (typeof require !== 'undefined' && require.main === module) {
+  const rawPort = process.env.PORT || '5000';
+  const parsedPort = Number.parseInt(rawPort, 10);
+  const port = (!Number.isNaN(parsedPort) && parsedPort >= 1 && parsedPort <= 65535) ? parsedPort : rawPort;
 
   const isManagedRuntime =
     process.env.NODE_ENV === 'production' || Boolean(process.env.PASSENGER_BASE_URI);
@@ -170,7 +196,7 @@ if (
         const [[{ count: users }]] = await pool.execute<any>('SELECT COUNT(*) as count FROM users');
 
         console.log('\n=========================================');
-        console.log('  Alvora Backend API (MySQL)');
+        console.log('  PlayBimboo Backend API (MySQL)');
         console.log(`  Status: RUNNING on http://localhost:${port}`);
         console.log('  Database: CONNECTED (MySQL)');
         console.log(`  Products: ${products} | Reviews: ${reviews} | Orders: ${orders}`);
@@ -178,7 +204,7 @@ if (
         console.log('=========================================\n');
       } catch (err) {
         console.log('\n=========================================');
-        console.log('  Alvora Backend API (MySQL)');
+        console.log('  PlayBimboo Backend API (MySQL)');
         console.log(`  Status: RUNNING on http://localhost:${port}`);
         console.log('  Database: DISCONNECTED (MySQL Error)');
         console.log('=========================================\n');

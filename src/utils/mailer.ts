@@ -1,3 +1,4 @@
+import { getEmailBrand, DEFAULT_BRAND_LOGO_URL } from '../config/emailBrand.js';
 import nodemailer from 'nodemailer';
 
 const REQUIRED_SMTP_ENVIRONMENT_VARIABLES = [
@@ -52,6 +53,9 @@ const createTransporter = () => {
     host: process.env.SMTP_HOST,
     port,
     secure: port === 465,
+    connectionTimeout: 30000,
+    greetingTimeout: 30000,
+    socketTimeout: 30000,
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS
@@ -81,15 +85,27 @@ const formatDeliveryDate = (value: unknown) => {
   });
 };
 
+const applyBrand = (content: EmailContent): EmailContent => {
+  const brand = getEmailBrand();
+  const transform = (value: string, html = false) => value
+    .replaceAll(DEFAULT_BRAND_LOGO_URL, html ? escapeHtml(brand.logo) : brand.logo)
+    .replaceAll('sales@playbimboo.com', html ? escapeHtml(brand.support) : brand.support)
+    .replace(/PlayBimboo(?: Toys)?/g, html ? escapeHtml(brand.name) : brand.name)
+    .replaceAll('#e11d48', brand.primary).replaceAll('#0f172a', brand.heading).replaceAll('#f8fafc', brand.background);
+  return { subject: transform(content.subject), html: transform(content.html, true), text: transform(content.text) };
+};
+
 const sendEmail = async (to: string, content: EmailContent): Promise<EmailDispatchResult> => {
   try {
+    const brand = getEmailBrand();
+    content = applyBrand(content);
     const info = await createTransporter().sendMail({
-      from: process.env.SMTP_FROM,
+      from: { name: brand.fromName, address: brand.sender },
       to,
       subject: content.subject,
       html: content.html,
       text: content.text,
-      replyTo: 'sales@alvora.com'
+      replyTo: brand.support
     });
     const acceptedCount = Array.isArray(info.accepted) ? info.accepted.length : 0;
     const rejectedCount = Array.isArray(info.rejected) ? info.rejected.length : 0;
@@ -123,7 +139,7 @@ export const buildOrderDeliveredEmail = (order: any): EmailContent => {
   const deliveryDate = formatDeliveryDate(order.deliveredAt || new Date());
   const items = Array.isArray(order.items) ? order.items : [];
   const itemRows = items.map((item: any) => {
-    const itemName = escapeHtml(item.name || 'Alvora product');
+    const itemName = escapeHtml(item.productName || item.name || 'PlayBimboo product');
     const variant = item.selectedVariant
       ? `<div style="color:#64748b;font-size:12px;margin-top:4px;">${escapeHtml(item.selectedVariant)}</div>`
       : '';
@@ -136,9 +152,9 @@ export const buildOrderDeliveredEmail = (order: any): EmailContent => {
         <td style="padding:12px 0;border-bottom:1px solid #e2e8f0;text-align:right;color:#0f172a;font-weight:700;">${formatPkr((Number(item.price) || 0) * Math.max(1, Number(item.quantity) || 1))}</td>
       </tr>`;
   }).join('');
-  const productNames = items.map((item: any) => String(item.name || 'Alvora product')).join(', ');
+  const productNames = items.map((item: any) => String(item.productName || item.name || 'PlayBimboo product')).join(', ');
   const total = formatPkr(order.total);
-  const subject = `Your Alvora Order Has Been Delivered - ${String(order.orderId || 'Order')}`;
+  const subject = `Your PlayBimboo Order Has Been Delivered - ${String(order.orderId || 'Order')}`;
 
   const html = `<!doctype html>
   <html lang="en">
@@ -147,13 +163,13 @@ export const buildOrderDeliveredEmail = (order: any): EmailContent => {
         <tr><td align="center">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #e2e8f0;border-radius:20px;overflow:hidden;">
             <tr><td style="background:#ffffff;padding:36px 28px 24px;text-align:center;border-bottom:1px solid #f1f5f9;">
-              <img src="https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786520001/alvoraLOGO_t6zqit.webp" alt="Alvora" style="width:180px;height:auto;margin:0 auto 12px;display:block;" />
+              <img src="https://playbimboo.com/playbimbooLOGO.webp" alt="PlayBimboo" style="width:180px;height:auto;margin:0 auto 12px;display:block;" />
               <p style="color:#64748b;margin:0;font-size:15px;font-weight:500;letter-spacing:0.5px;">Delivered with smiles</p>
             </td></tr>
             <tr><td style="padding:32px 28px;">
               <h2 style="color:#0f172a;font-size:24px;margin:0 0 16px;">Your order has been delivered!</h2>
               <p style="margin:0 0 12px;line-height:1.6;">Hi <strong>${customerName}</strong>,</p>
-              <p style="margin:0 0 22px;line-height:1.6;">Great news—your Alvora order <strong>#${orderId}</strong> was delivered on <strong>${escapeHtml(deliveryDate)}</strong>.</p>
+              <p style="margin:0 0 22px;line-height:1.6;">Great news—your PlayBimboo order <strong>#${orderId}</strong> was delivered on <strong>${escapeHtml(deliveryDate)}</strong>.</p>
               <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;padding:16px;margin-bottom:22px;">
                 <strong style="color:#166534;">Delivery confirmed</strong>
                 <div style="color:#15803d;font-size:13px;margin-top:4px;">We hope this order brings plenty of happy playtime.</div>
@@ -166,10 +182,10 @@ export const buildOrderDeliveredEmail = (order: any): EmailContent => {
                 ${itemRows}
               </table>
               <p style="font-size:18px;text-align:right;color:#e11d48;font-weight:800;margin:18px 0 26px;">Total: ${total}</p>
-              <p style="line-height:1.6;margin:0 0 12px;">If anything is missing or damaged, reply to this email or contact <a href="mailto:sales@alvora.com" style="color:#e11d48;">sales@alvora.com</a>.</p>
-              <p style="line-height:1.6;margin:0;">Thank you for choosing Alvora!</p>
+              <p style="line-height:1.6;margin:0 0 12px;">If anything is missing or damaged, reply to this email or contact <a href="mailto:sales@playbimboo.com" style="color:#e11d48;">sales@playbimboo.com</a>.</p>
+              <p style="line-height:1.6;margin:0;">Thank you for choosing PlayBimboo!</p>
             </td></tr>
-            <tr><td style="background:#f8fafc;padding:18px 28px;text-align:center;color:#94a3b8;font-size:12px;">Alvora · Customer Support: sales@alvora.com</td></tr>
+            <tr><td style="background:#f8fafc;padding:18px 28px;text-align:center;color:#94a3b8;font-size:12px;">PlayBimboo · Customer Support: sales@playbimboo.com</td></tr>
           </table>
         </td></tr>
       </table>
@@ -177,15 +193,15 @@ export const buildOrderDeliveredEmail = (order: any): EmailContent => {
   </html>`;
 
   const text = [
-    'Alvora - Your order has been delivered!',
+    'PlayBimboo - Your order has been delivered!',
     `Hi ${String(order.customerName || order.shippingAddress?.fullName || 'Customer')},`,
     `Order #${String(order.orderId || 'Order')} was delivered on ${deliveryDate}.`,
-    `Products: ${productNames || 'Alvora product'}`,
+    `Products: ${productNames || 'PlayBimboo product'}`,
     `Total: ${total}`,
-    'Need help? Reply to this email or contact sales@alvora.com.'
+    'Need help? Reply to this email or contact sales@playbimboo.com.'
   ].join('\n\n');
 
-  return { subject, html, text };
+  return applyBrand({ subject, html, text });
 };
 
 export const sendOrderDeliveredEmail = (order: any) =>
@@ -196,7 +212,7 @@ export const buildOrderConfirmationEmail = (order: any, options?: { isNewAccount
   const itemLines = items.map((item: any) => {
     const quantity = Math.max(1, Number(item.quantity) || 1);
     const variant = item.selectedVariant ? ` (${String(item.selectedVariant)})` : '';
-    return `${String(item.name || 'Alvora product')}${variant} x ${quantity} at ${formatPkr(item.price)}`;
+    return `${String(item.productName || item.name || 'PlayBimboo product')}${variant} x ${quantity} at ${formatPkr(item.price)}`;
   }).join('\n');
   const itemsHtml = items.map((item: any) => {
     const quantity = Math.max(1, Number(item.quantity) || 1);
@@ -205,7 +221,7 @@ export const buildOrderConfirmationEmail = (order: any, options?: { isNewAccount
       ? `<div style="color:#64748b;font-size:12px;margin-top:4px;">${escapeHtml(item.selectedVariant)}</div>`
       : '';
     return `<tr>
-      <td style="padding:13px 0;border-bottom:1px solid #e2e8f0;"><strong style="color:#0f172a;">${escapeHtml(item.name || 'Alvora product')}</strong>${variant}</td>
+      <td style="padding:13px 0;border-bottom:1px solid #e2e8f0;"><strong style="color:#0f172a;">${escapeHtml(item.productName || item.name || 'PlayBimboo product')}</strong>${variant}</td>
       <td style="padding:13px 8px;border-bottom:1px solid #e2e8f0;text-align:center;color:#475569;">${quantity}</td>
       <td style="padding:13px 8px;border-bottom:1px solid #e2e8f0;text-align:right;color:#475569;">${formatPkr(itemPrice)}</td>
       <td style="padding:13px 0;border-bottom:1px solid #e2e8f0;text-align:right;color:#0f172a;font-weight:700;">${formatPkr(itemPrice * quantity)}</td>
@@ -226,19 +242,19 @@ export const buildOrderConfirmationEmail = (order: any, options?: { isNewAccount
   const discountHtml = discount > 0
     ? `<tr><td style="padding:5px 0;color:#64748b;">Discount</td><td style="padding:5px 0;text-align:right;color:#15803d;font-weight:700;">-${formatPkr(discount)}</td></tr>`
     : '';
-  const subject = `Your Alvora Order Is Confirmed - ${orderId}`;
+  const subject = `Your PlayBimboo Order Is Confirmed - ${orderId}`;
   const html = `<!doctype html>
   <html lang="en"><body style="margin:0;background:#f8fafc;font-family:Arial,sans-serif;color:#334155;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8fafc;padding:24px 12px;"><tr><td align="center">
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #e2e8f0;border-radius:20px;overflow:hidden;">
         <tr><td style="background:#ffffff;padding:36px 28px 24px;text-align:center;border-bottom:1px solid #f1f5f9;">
-          <img src="https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786520001/alvoraLOGO_t6zqit.webp" alt="Alvora" style="width:180px;height:auto;margin:0 auto 12px;display:block;" />
+          <img src="https://playbimboo.com/playbimbooLOGO.webp" alt="PlayBimboo" style="width:180px;height:auto;margin:0 auto 12px;display:block;" />
           <p style="color:#64748b;margin:0;font-size:15px;font-weight:500;letter-spacing:0.5px;">Happy playtime starts here</p>
         </td></tr>
         <tr><td style="padding:32px 28px;">
           <h2 style="color:#0f172a;font-size:24px;margin:0 0 16px;">Your order is confirmed!</h2>
           <p style="margin:0 0 12px;line-height:1.6;">Hi <strong>${escapeHtml(customerName)}</strong>,</p>
-          <p style="margin:0 0 20px;line-height:1.6;">Thank you for shopping with Alvora. We have received order <strong>#${escapeHtml(orderId)}</strong> placed on <strong>${escapeHtml(orderDate)}</strong>.</p>
+          <p style="margin:0 0 20px;line-height:1.6;">Thank you for shopping with PlayBimboo. We have received order <strong>#${escapeHtml(orderId)}</strong> placed on <strong>${escapeHtml(orderDate)}</strong>.</p>
           <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:14px;padding:16px;margin-bottom:22px;"><strong style="color:#1d4ed8;">What happens next?</strong><div style="color:#1e40af;font-size:13px;line-height:1.5;margin-top:4px;">Our team will contact you to confirm the order before it is dispatched.</div></div>
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom:20px;background:#f8fafc;border-radius:12px;padding:12px;">
             <tr><td style="padding:5px;color:#64748b;">Order number</td><td style="padding:5px;text-align:right;font-weight:700;color:#0f172a;">${escapeHtml(orderId)}</td></tr>
@@ -254,24 +270,24 @@ export const buildOrderConfirmationEmail = (order: any, options?: { isNewAccount
             <tr><td style="padding:10px 0 0;color:#0f172a;font-size:17px;font-weight:800;">Final total</td><td style="padding:10px 0 0;text-align:right;color:#e11d48;font-size:19px;font-weight:900;">${formatPkr(order.total)}</td></tr>
           </table>
           <div style="background:#f8fafc;border-radius:14px;padding:16px;margin-bottom:22px;"><h3 style="color:#0f172a;font-size:16px;margin:0 0 8px;">Delivery address</h3><p style="margin:0;line-height:1.6;color:#334155;"><strong>${escapeHtml(address.fullName || customerName)}</strong><br/>${escapeHtml(fullAddress)}${contactPhone ? `<br/>Phone: ${escapeHtml(contactPhone)}` : ''}</p></div>
-          ${options?.isNewAccount ? `<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:14px;padding:16px;margin-bottom:22px;"><h3 style="color:#b45309;font-size:16px;margin:0 0 8px;">Your Alvora account has been created</h3><p style="margin:0 0 12px;line-height:1.6;color:#92400e;">A Alvora account has been created for you automatically. You are already signed in on this device, so you can start managing your orders immediately. A temporary password has also been generated for future sign-ins. For security, you can change it anytime from the Password section in your Profile.</p><p style="margin:0 0 4px;color:#92400e;"><strong>Email:</strong> ${escapeHtml(String(order.email || ''))}</p><p style="margin:0 0 16px;color:#92400e;"><strong>Temporary Password:</strong> ${escapeHtml(options.rawPassword || '')}</p><a href="${process.env.FRONTEND_URL || 'https://play-bimboo.vercel.app'}/profile" style="display:inline-block;background:#d97706;color:#ffffff;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:bold;">View Your Profile</a></div>` : (options?.isNewAccount === false ? `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;padding:16px;margin-bottom:22px;"><h3 style="color:#15803d;font-size:16px;margin:0 0 8px;">Track your order</h3><p style="margin:0 0 12px;line-height:1.6;color:#166534;">You already have an account with us. Log in with your existing credentials to track this order.</p><a href="${process.env.FRONTEND_URL || 'https://play-bimboo.vercel.app'}/login" style="display:inline-block;background:#15803d;color:#ffffff;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:bold;">Log In to Track Order</a></div>` : '')}
-          <p style="line-height:1.6;margin:0 0 12px;">Questions about your order? Reply to this email or contact <a href="mailto:sales@alvora.com" style="color:#e11d48;">sales@alvora.com</a>.</p><p style="line-height:1.6;margin:0;">Thank you for choosing Alvora!</p>
+          ${options?.isNewAccount ? `<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:14px;padding:16px;margin-bottom:22px;"><h3 style="color:#b45309;font-size:16px;margin:0 0 8px;">Your PlayBimboo account has been created</h3><p style="margin:0 0 12px;line-height:1.6;color:#92400e;">A PlayBimboo account has been created for you automatically. You are already signed in on this device, so you can start managing your orders immediately. A temporary password has also been generated for future sign-ins. For security, you can change it anytime from the Password section in your Profile.</p><p style="margin:0 0 4px;color:#92400e;"><strong>Email:</strong> ${escapeHtml(String(order.email || ''))}</p><p style="margin:0 0 16px;color:#92400e;"><strong>Temporary Password:</strong> ${escapeHtml(options.rawPassword || '')}</p><a href="${getEmailBrand().website}/account" style="display:inline-block;background:#d97706;color:#ffffff;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:bold;">View Your Profile</a></div>` : (options?.isNewAccount === false ? `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;padding:16px;margin-bottom:22px;"><h3 style="color:#15803d;font-size:16px;margin:0 0 8px;">Track your order</h3><p style="margin:0 0 12px;line-height:1.6;color:#166534;">You already have an account with us. Log in with your existing credentials to track this order.</p><a href="${getEmailBrand().website}/account" style="display:inline-block;background:#15803d;color:#ffffff;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:bold;">Log In to Track Order</a></div>` : '')}
+          <p style="line-height:1.6;margin:0 0 12px;">Questions about your order? Reply to this email or contact <a href="mailto:sales@playbimboo.com" style="color:#e11d48;">sales@playbimboo.com</a>.</p><p style="line-height:1.6;margin:0;">Thank you for choosing PlayBimboo!</p>
         </td></tr>
-        <tr><td style="background:#f8fafc;padding:18px 28px;text-align:center;color:#94a3b8;font-size:12px;">Alvora &middot; Customer Support: sales@alvora.com</td></tr>
+        <tr><td style="background:#f8fafc;padding:18px 28px;text-align:center;color:#94a3b8;font-size:12px;">PlayBimboo &middot; Customer Support: sales@playbimboo.com</td></tr>
       </table>
     </td></tr></table>
   </body></html>`;
   const text = [
-    'Alvora - Your order is confirmed!', `Hi ${customerName},`,
+    'PlayBimboo - Your order is confirmed!', `Hi ${customerName},`,
     `Order #${orderId} was placed on ${orderDate}.`, `Status: ${orderStatus}`, `Payment: ${paymentMethod}`,
-    `Products:\n${itemLines || 'Alvora product'}`, `Subtotal: ${formatPkr(order.subtotal)}`,
+    `Products:\n${itemLines || 'PlayBimboo product'}`, `Subtotal: ${formatPkr(order.subtotal)}`,
     `Delivery charges: ${formatPkr(order.deliveryCharge)}`,
     ...(discount > 0 ? [`Discount: -${formatPkr(discount)}`] : []),
     `Final total: ${formatPkr(order.total)}`,
     `Delivery address: ${String(address.fullName || customerName)}, ${fullAddress}${contactPhone ? `, Phone: ${contactPhone}` : ''}`,
     ...(options?.isNewAccount ? [
       '--- YOUR NEW ACCOUNT ---',
-      'A Alvora account has been created for you automatically. You are already signed in on this device, so you can start managing your orders immediately. A temporary password has also been generated for future sign-ins. For security, you can change it anytime from the Password section in your Profile.',
+      'A PlayBimboo account has been created for you automatically. You are already signed in on this device, so you can start managing your orders immediately. A temporary password has also been generated for future sign-ins. For security, you can change it anytime from the Password section in your Profile.',
       `Email: ${String(order.email || '')}`,
       `Temporary Password: ${options.rawPassword || ''}`,
       '-------------------------'
@@ -281,9 +297,9 @@ export const buildOrderConfirmationEmail = (order: any, options?: { isNewAccount
       '------------------------'
     ] : [])),
     'Our team will contact you to confirm the order before it is dispatched.',
-    'Need help? Reply to this email or contact sales@alvora.com.'
+    'Need help? Reply to this email or contact sales@playbimboo.com.'
   ].join('\n\n');
-  return { subject, html, text };
+  return applyBrand({ subject, html, text });
 };
 
 export const sendOrderConfirmationEmail = (order: any, options?: { isNewAccount?: boolean; rawPassword?: string }) =>
@@ -292,28 +308,15 @@ export const sendOrderConfirmationEmail = (order: any, options?: { isNewAccount?
 export const sendOrderStatusEmail = async (order: any) => {
   const content: EmailContent = {
     subject: `Order Update #${String(order.orderId || 'Order')} - ${String(order.status || 'Updated')}`,
-    html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:32px 24px;border:1px solid #e2e8f0;border-radius:16px;"><img src="https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786520001/alvoraLOGO_t6zqit.webp" alt="Alvora" style="width:180px;height:auto;margin:0 auto 24px;display:block;" /><h2 style="color:#0f172a;text-align:center;margin:0 0 24px;">Order Update</h2><p>Hi <strong>${escapeHtml(order.customerName || 'Customer')}</strong>,</p><p>Order <strong>#${escapeHtml(order.orderId || 'Order')}</strong> is now <strong>${escapeHtml(order.status || 'Updated')}</strong>.</p>${order.trackingNumber ? `<p>Tracking code: <strong>${escapeHtml(order.trackingNumber)}</strong></p>` : ''}<br/><p>Support: <a href="mailto:sales@alvora.com" style="color:#e11d48;">sales@alvora.com</a></p></div>`,
-    text: `Alvora order #${String(order.orderId || 'Order')} is now ${String(order.status || 'Updated')}. Support: sales@alvora.com.`
+    html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:32px 24px;border:1px solid #e2e8f0;border-radius:16px;"><img src="https://playbimboo.com/playbimbooLOGO.webp" alt="PlayBimboo" style="width:180px;height:auto;margin:0 auto 24px;display:block;" /><h2 style="color:#0f172a;text-align:center;margin:0 0 24px;">Order Update</h2><p>Hi <strong>${escapeHtml(order.customerName || 'Customer')}</strong>,</p><p>Order <strong>#${escapeHtml(order.orderId || 'Order')}</strong> is now <strong>${escapeHtml(order.status || 'Updated')}</strong>.</p>${order.trackingNumber ? `<p>Tracking code: <strong>${escapeHtml(order.trackingNumber)}</strong></p>` : ''}<br/><p>Support: <a href="mailto:sales@playbimboo.com" style="color:#e11d48;">sales@playbimboo.com</a></p></div>`,
+    text: `PlayBimboo order #${String(order.orderId || 'Order')} is now ${String(order.status || 'Updated')}. Support: sales@playbimboo.com.`
   };
   return sendEmail(String(order.email || ''), content);
 };
 
 export const getAdminNotificationRecipients = (): string[] => {
-  const raw = process.env.NEW_ORDER_NOTIFICATION_EMAILS || '';
-  let emails = raw.split(',').map(e => e.trim()).filter(e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
-  
-  if (emails.length === 0) {
-    const fallbackUser = process.env.SMTP_USER || '';
-    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fallbackUser)) {
-      emails.push(fallbackUser);
-    } else {
-      const fallbackFromMatch = (process.env.SMTP_FROM || '').match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/i);
-      if (fallbackFromMatch && fallbackFromMatch[0]) {
-        emails.push(fallbackFromMatch[0]);
-      }
-    }
-  }
-  return Array.from(new Set(emails));
+  const raw = process.env.ADMIN_EMAIL?.trim() || process.env.NEW_ORDER_NOTIFICATION_EMAILS || '';
+  return Array.from(new Set(raw.split(',').map(value => value.trim()).filter(value => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))));
 };
 
 export const buildAdminNewOrderEmail = (order: any): EmailContent => {
@@ -351,16 +354,15 @@ export const buildAdminNewOrderEmail = (order: any): EmailContent => {
     ? `<tr><td style="padding:5px 0;color:#64748b;">Discount</td><td style="padding:5px 0;text-align:right;color:#15803d;font-weight:700;">-${formatPkr(discount)}</td></tr>`
     : '';
 
-  const adminUrlBase = process.env.ADMIN_APP_URL || process.env.FRONTEND_URL || '';
-  const adminOrderUrl = adminUrlBase ? `${adminUrlBase.replace(/\/$/, '')}/admin/orders/${orderId}` : '/admin/orders';
-  const subject = `New Alvora Order Received - ${orderId} - ${formatPkr(order.total)}`;
+  const adminOrderUrl = `${getEmailBrand().admin}/admin/orders`;
+  const subject = `New PlayBimboo Order Received - ${orderId} - ${formatPkr(order.total)}`;
   
   const html = `<!doctype html>
   <html lang="en"><body style="margin:0;background:#f8fafc;font-family:Arial,sans-serif;color:#334155;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8fafc;padding:24px 12px;"><tr><td align="center">
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #e2e8f0;border-radius:20px;overflow:hidden;">
         <tr><td style="background:#ffffff;padding:36px 28px 24px;text-align:center;border-bottom:1px solid #f1f5f9;">
-          <img src="https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786520001/alvoraLOGO_t6zqit.webp" alt="Alvora" style="width:180px;height:auto;margin:0 auto 16px;display:block;" />
+          <img src="https://playbimboo.com/playbimbooLOGO.webp" alt="PlayBimboo" style="width:180px;height:auto;margin:0 auto 16px;display:block;" />
           <h1 style="color:#0f172a;font-size:22px;margin:0;">You've received a new order</h1>
         </td></tr>
         <tr><td style="padding:32px 28px;">
@@ -407,7 +409,7 @@ export const buildAdminNewOrderEmail = (order: any): EmailContent => {
   </body></html>`;
 
   const text = [
-    `New Alvora Order Received - ${orderId}`,
+    `New PlayBimboo Order Received - ${orderId}`,
     `Order Date: ${orderDate}`,
     `Status: ${orderStatus}`,
     `Payment: ${paymentMethod}`,
@@ -425,7 +427,7 @@ export const buildAdminNewOrderEmail = (order: any): EmailContent => {
     `View Order in Admin: ${adminOrderUrl}`
   ].join('\n');
 
-  return { subject, html, text };
+  return applyBrand({ subject, html, text });
 };
 
 export const sendAdminNewOrderEmail = async (order: any, recipients: string[]) => {
@@ -437,32 +439,32 @@ export const sendAdminNewOrderEmail = async (order: any, recipients: string[]) =
 };
 
 export const sendPasswordResetEmail = async (user: any, code: string) => {
-  const subject = 'Reset your Alvora password';
+  const subject = 'Reset your PlayBimboo password';
   const html = `
     <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#333;border:1px solid #e2e8f0;border-radius:16px;padding:32px 24px;">
-      <img src="https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786520001/alvoraLOGO_t6zqit.webp" alt="Alvora" style="width:180px;height:auto;margin:0 auto 24px;display:block;" />
+      <img src="https://playbimboo.com/playbimbooLOGO.webp" alt="PlayBimboo" style="width:180px;height:auto;margin:0 auto 24px;display:block;" />
       <h2 style="color:#0f172a;text-align:center;margin-top:0;">Password Reset</h2>
       <p>Hello ${escapeHtml(user.name)},</p>
-      <p>You recently requested to reset your password for your Alvora account. Use the 6-digit verification code below to reset it.</p>
+      <p>You recently requested to reset your password for your PlayBimboo account. Use the 6-digit verification code below to reset it.</p>
       <div style="margin: 30px 0; text-align: center;">
         <span style="background-color:#f1f5f9;color:#0f172a;padding:16px 32px;border-radius:12px;font-weight:900;font-size:32px;letter-spacing:4px;">${code}</span>
       </div>
-      <p>This verification code expires in exactly <strong>30 seconds</strong>.</p>
+      <p>This verification code expires in exactly <strong>1 hour</strong>.</p>
       <p>If you did not request a password reset, please ignore this email. Your account is safe.</p>
-      <p>Thanks,<br>The Alvora Team</p>
+      <p>Thanks,<br>The PlayBimboo Team</p>
     </div>
   `;
-  const text = `Hello ${user.name},\n\nYou recently requested to reset your password. Your 6-digit verification code is:\n\n${code}\n\nThis code expires in 30 seconds.\n\nThanks,\nThe Alvora Team`;
+  const text = `Hello ${user.name},\n\nYou recently requested to reset your password. Your 6-digit verification code is:\n\n${code}\n\nThis code expires in 1 hour.\n\nThanks,\nThe PlayBimboo Team`;
   
   return sendEmail(user.email, { subject, html, text });
 };
 
 export const sendAccountActivationEmail = async (user: any, token: string) => {
-  const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}&activate=1`;
-  const subject = 'Activate Your Alvora Account';
+  const resetUrl = `${getEmailBrand().website}/reset-password?token=${encodeURIComponent(token)}&activate=1`;
+  const subject = 'Activate Your PlayBimboo Account';
   const html = `
     <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#333;border:1px solid #e2e8f0;border-radius:16px;padding:32px 24px;">
-      <img src="https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786520001/alvoraLOGO_t6zqit.webp" alt="Alvora" style="width:180px;height:auto;margin:0 auto 24px;display:block;" />
+      <img src="https://playbimboo.com/playbimbooLOGO.webp" alt="PlayBimboo" style="width:180px;height:auto;margin:0 auto 24px;display:block;" />
       <h2 style="color:#0f172a;text-align:center;margin-top:0;">Welcome!</h2>
       <p>Hello ${escapeHtml(user.name)},</p>
       <p>Thank you for your recent order! We've created an account for you to easily track your orders and manage your wishlist.</p>
@@ -471,17 +473,17 @@ export const sendAccountActivationEmail = async (user: any, token: string) => {
         <a href="${resetUrl}" style="background-color:#e11d48;color:#fff;padding:12px 24px;text-decoration:none;border-radius:8px;font-weight:bold;">Set Your Password</a>
       </div>
       <p>This activation link is only valid for the next 24 hours.</p>
-      <p>Thanks,<br>The Alvora Team</p>
+      <p>Thanks,<br>The PlayBimboo Team</p>
     </div>
   `;
-  const text = `Hello ${user.name},\n\nThank you for your recent order! We've created an account for you to easily track your orders. Please visit the link below to set your password and activate your account:\n${resetUrl}\n\nThanks,\nThe Alvora Team`;
+  const text = `Hello ${user.name},\n\nThank you for your recent order! We've created an account for you to easily track your orders. Please visit the link below to set your password and activate your account:\n${resetUrl}\n\nThanks,\nThe PlayBimboo Team`;
   
   return sendEmail(user.email, { subject, html, text });
 };
 
 export const sendContactConfirmationEmail = async (email: string, name: string) => {
-  const subject = 'Thank you for contacting Alvora';
-  const html = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;border:1px solid #e2e8f0;border-radius:16px;padding:32px 24px;"><img src="https://res.cloudinary.com/dn2bcvcvg/image/upload/v1786520001/alvoraLOGO_t6zqit.webp" alt="Alvora" style="width:180px;height:auto;margin:0 auto 24px;display:block;" /><h1 style="color:#0f172a;text-align:center;font-size:24px;margin-top:0;">Hello ${name},</h1><p>Thank you for your enquiry. We have received your message and will contact you as soon as possible.</p><br/><p>Best regards,<br/>The Alvora Team</p></div>`;
-  const text = `Hello ${name},\n\nThank you for your enquiry. We have received your message and will contact you as soon as possible.\n\nBest regards,\nThe Alvora Team`;
+  const subject = 'Thank you for contacting PlayBimboo';
+  const html = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;border:1px solid #e2e8f0;border-radius:16px;padding:32px 24px;"><img src="https://playbimboo.com/playbimbooLOGO.webp" alt="PlayBimboo" style="width:180px;height:auto;margin:0 auto 24px;display:block;" /><h1 style="color:#0f172a;text-align:center;font-size:24px;margin-top:0;">Hello ${escapeHtml(name)},</h1><p>Thank you for your enquiry. We have received your message and will contact you as soon as possible.</p><br/><p>Best regards,<br/>The PlayBimboo Team</p></div>`;
+  const text = `Hello ${name},\n\nThank you for your enquiry. We have received your message and will contact you as soon as possible.\n\nBest regards,\nThe PlayBimboo Team`;
   return sendEmail(email, { subject, html, text });
 };
