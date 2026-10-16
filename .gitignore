@@ -4,7 +4,6 @@ dist/
 coverage/
 .DS_Store
 *.log
-.env*
 !.env.example
 .vercel
 
@@ -22,3 +21,4 @@ inject_*.js
 register_*.js
 screenshot.js
 *.txt
+config.bat

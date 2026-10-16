@@ -195,7 +195,7 @@ router.post('/', async (req: Request, res: Response) => {
   await conn.beginTransaction();
 
   try {
-    const { customerName, email, phone, items, discountAmount = 0, shippingAddress, appliedCoupon, checkoutRequestId, shippingFee: clientShippingFee } = req.body;
+    const { customerName, email, phone, items, discountAmount = 0, shippingAddress, appliedCoupon, checkoutRequestId, shippingFee: clientShippingFee = req.body.deliveryCharge } = req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
       await conn.rollback();
@@ -361,7 +361,12 @@ router.post('/', async (req: Request, res: Response) => {
       }
       try {
         const recipients = getAdminNotificationRecipients();
-        if (recipients.length > 0) await sendAdminNewOrderEmail(newOrder, recipients);
+        if (recipients.length > 0) {
+          const result = await sendAdminNewOrderEmail(newOrder, recipients);
+          console.log("[Admin Email] Order " + orderId + " notification sent to: " + recipients.join(", ") + " (" + result.acceptedCount + " accepted)");
+        } else {
+          console.warn("[Admin Email] No admin recipients configured for order " + orderId);
+        }
       } catch (e) { logEmailFailure('Admin new order', orderId, e); }
       try {
         const capiOrder = { ...newOrder, email: newOrder.guestEmail, phone: newOrder.guestPhone, customerName: newOrder.shippingAddress?.name };

@@ -4,15 +4,15 @@
   "description": "Express + MySQL API Backend for PlayBimboo Toys",
   "main": "dist/server.js",
   "engines": {
-    "node": ">=18"
+    "node": ">=20.9.0"
   },
   "scripts": {
-    "dev": "tsx src/server.ts",
-    "build": "tsc",
+    "dev": "node init && tsx src/server.ts",
+    "build": "node init && tsc",
     "backfill:product-thumbnails": "tsx src/scripts/backfillProductThumbnails.ts",
     "migrate:product-merchandising": "tsx src/scripts/migrateProductMerchandising.ts",
-    "test": "tsx --test tests/*.test.ts",
-    "start": "node app.js",
+    "test": "npm run build && node --test tests/*.test.cjs",
+    "start": "node init && node app.js",
     "seed:reviews": "tsx src/scripts/seedReviews.ts"
   },
   "dependencies": {

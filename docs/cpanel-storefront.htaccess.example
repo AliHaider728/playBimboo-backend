@@ -1,0 +1,7 @@
+# Append to the storefront document-root .htaccess, preserving Passenger config.
+# Let Next own HTML/RSC caching. Keep its immutable browser cache for hashed assets.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{REQUEST_URI} !^/_next/static/
+  RewriteRule .* - [E=Cache-Control:no-cache]
+</IfModule>

@@ -13,7 +13,8 @@ const MYSQL_CONFIG: mysql.PoolOptions = {
   database: process.env.MYSQL_DATABASE,
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0,
+  connectTimeout: 10000,
+  queueLimit: 100,
   enableKeepAlive: true,
   keepAliveInitialDelay: 0,
   typeCast: function (field: any, next: any) {
