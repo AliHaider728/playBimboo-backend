@@ -315,8 +315,18 @@ export const sendOrderStatusEmail = async (order: any) => {
 };
 
 export const getAdminNotificationRecipients = (): string[] => {
-  const raw = process.env.ADMIN_EMAIL?.trim() || process.env.NEW_ORDER_NOTIFICATION_EMAILS || '';
-  return Array.from(new Set(raw.split(',').map(value => value.trim()).filter(value => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))));
+  const sources = [
+    process.env.ADMIN_EMAIL,
+    process.env.NEW_ORDER_NOTIFICATION_EMAILS,
+    'playbimboo@gmail.com'
+  ];
+  const combined = sources.filter(Boolean).join(',');
+  return Array.from(new Set(
+    combined
+      .split(',')
+      .map(value => value.trim().toLowerCase())
+      .filter(value => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))
+  ));
 };
 
 export const buildAdminNewOrderEmail = (order: any): EmailContent => {
@@ -434,8 +444,20 @@ export const sendAdminNewOrderEmail = async (order: any, recipients: string[]) =
   if (!recipients || recipients.length === 0) {
     throw new EmailDispatchError('NEW_ORDER_RECIPIENT_NOT_CONFIGURED');
   }
-  const to = recipients.join(',');
-  return sendEmail(to, buildAdminNewOrderEmail(order));
+  const emailContent = buildAdminNewOrderEmail(order);
+  const results = await Promise.allSettled(
+    recipients.map(recipient => sendEmail(recipient, emailContent))
+  );
+  const successful = results.filter(r => r.status === 'fulfilled');
+  if (successful.length === 0 && results.length > 0) {
+    const firstError = (results[0] as PromiseRejectedResult).reason;
+    throw firstError;
+  }
+  return {
+    messageId: successful.length > 0 ? (successful[0] as PromiseFulfilledResult<EmailDispatchResult>).value.messageId : '',
+    acceptedCount: successful.length,
+    rejectedCount: results.length - successful.length
+  };
 };
 
 export const sendPasswordResetEmail = async (user: any, code: string) => {

@@ -4,7 +4,7 @@ dotenv.config({ path: path.join(__dirname, '..', '.env') });
 dotenv.config({ path: path.join(process.cwd(), '.env') });
 dotenv.config();
 import express, { Request, Response } from 'express';
-import cors, { CorsOptions } from 'cors';
+import { apiCors, noStore } from './middleware/httpPolicy.js';
 
 import uploadRoutes from './mysql-routes/upload.js';
 import { pool } from './mysql-lib/db.js';
@@ -28,63 +28,13 @@ const execAsync = promisify(exec);
 
 const app = express();
 
-const allowedOrigins = [
-  'https://playbimboo.com',
-  'https://www.playbimboo.com',
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'https://play-bimboo.vercel.app'
-];
+app.use(noStore);
+app.use(apiCors);
 
-const isAllowedOrigin = (origin: string | undefined): boolean => {
-  if (!origin) return true;
-  if (allowedOrigins.includes(origin)) return true;
-  try {
-    const url = new URL(origin);
-    const originLower = url.origin.toLowerCase();
-    if (allowedOrigins.includes(originLower)) return true;
-    const hostname = url.hostname.toLowerCase();
-    if (hostname === 'playbimboo.com' || hostname.endsWith('.playbimboo.com')) return true;
-    if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
-    if (hostname === 'play-bimboo.vercel.app') return true;
-  } catch {
-    // ignore
-  }
-  return false;
-};
-
-// Explicit CORS headers and preflight handler
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (origin && isAllowedOrigin(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
-    res.setHeader('Access-Control-Max-Age', '86400');
-  }
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(204);
-  }
-  next();
+app.get('/api/live', (_req: Request, res: Response) => {
+  res.json({ status: 'ok', service: 'playbimboo-api' });
 });
 
-const corsOptions: CorsOptions = {
-  origin: (origin, callback) => {
-    if (!origin || isAllowedOrigin(origin)) {
-      callback(null, true);
-    } else {
-      callback(null, false);
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
-  optionsSuccessStatus: 204
-};
-
-app.options('*', cors(corsOptions));
-app.use(cors(corsOptions));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 

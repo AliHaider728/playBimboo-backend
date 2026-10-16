@@ -1,0 +1,10 @@
+# LiteSpeed policy: append to the API document-root .htaccess.
+# Preserve cPanel-generated Passenger directives. Do not add CORS headers here.
+<IfModule LiteSpeed>
+  CacheDisable public /
+  CacheDisable private /
+</IfModule>
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule .* - [E=Cache-Control:no-cache]
+</IfModule>
